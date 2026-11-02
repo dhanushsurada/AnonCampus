@@ -5,7 +5,7 @@ Asserts DATABASE_URL, REDIS_URL, SECRET_KEY at import time in production.
 import os
 from pydantic_settings import BaseSettings
 from functools import lru_cache
-from typing import List
+from typing import List, Optional
 
 
 class Settings(BaseSettings):
@@ -18,6 +18,16 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     ENVIRONMENT: str = "development"
     ALLOWED_ORIGINS: List[str] = ["http://localhost:3000"]
+
+    # SMTP / Outgoing Email Settings
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_TLS: bool = True
+    EMAILS_FROM_EMAIL: Optional[str] = None
+    EMAILS_FROM_NAME: str = "AnonCampus Support"
+    FRONTEND_URL: str = "http://localhost:3000"
 
     # Scoring weights
     SCORE_WEIGHT_REPORTS: float = 0.35

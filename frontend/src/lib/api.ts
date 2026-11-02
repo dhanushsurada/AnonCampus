@@ -171,6 +171,14 @@ export const authApi = {
 
   changePassword: (data: { current_password: string; new_password: string }) =>
     api.post('/auth/change-password', data),
+
+  resetPasswordByStudentCredentials: (data: {
+    email: string
+    student_id: string
+    department: string
+    academic_year: number
+    new_password: string
+  }) => api.post('/auth/reset-password-student-credentials', data),
 }
 
 export const issuesApi = {

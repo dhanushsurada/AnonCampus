@@ -83,6 +83,23 @@ class ChangePasswordRequest(BaseModel):
         return v
 
 
+class StudentCredentialResetRequest(BaseModel):
+    email: EmailStr
+    student_id: str
+    department: str
+    academic_year: int
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain at least one digit")
+        return v
+
+
 # ── Token ─────────────────────────────────────────────────────────────────────
 
 class TokenResponse(BaseModel):

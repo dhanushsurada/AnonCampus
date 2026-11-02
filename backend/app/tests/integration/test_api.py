@@ -306,6 +306,45 @@ async def test_forgot_and_reset_password(client):
 
 
 @pytest.mark.anyio
+async def test_reset_password_by_student_credentials(client):
+    reg = await client.post("/api/auth/register", json={
+        "email": "creduser@nsrit.edu.in",
+        "password": "OldPass1234",
+        "student_id": "CRED001",
+        "department": "ECE",
+        "academic_year": 2,
+    })
+    assert reg.status_code == 201
+
+    # Attempt with incorrect roll number -> 400
+    bad_resp = await client.post("/api/auth/reset-password-student-credentials", json={
+        "email": "creduser@nsrit.edu.in",
+        "student_id": "WRONG_ID",
+        "department": "ECE",
+        "academic_year": 2,
+        "new_password": "NewSecretPass99",
+    })
+    assert bad_resp.status_code == 400
+
+    # Attempt with correct student credentials -> 200
+    good_resp = await client.post("/api/auth/reset-password-student-credentials", json={
+        "email": "creduser@nsrit.edu.in",
+        "student_id": "CRED001",
+        "department": "ECE",
+        "academic_year": 2,
+        "new_password": "NewSecretPass99",
+    })
+    assert good_resp.status_code == 200
+
+    # Verify login with new password
+    login_resp = await client.post("/api/auth/login", json={
+        "email": "creduser@nsrit.edu.in",
+        "password": "NewSecretPass99",
+    })
+    assert login_resp.status_code == 200
+
+
+@pytest.mark.anyio
 async def test_change_password(client, student_token):
     # Authenticated change password
     change_resp = await client.post("/api/auth/change-password",

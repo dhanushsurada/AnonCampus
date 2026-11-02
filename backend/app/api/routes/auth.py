@@ -20,6 +20,7 @@ from app.models.user import User, Institution
 from app.schemas.auth import (
     RegisterRequest, LoginRequest, TokenResponse, UserResponse,
     ForgotPasswordRequest, ResetPasswordRequest, ChangePasswordRequest,
+    StudentCredentialResetRequest,
 )
 from app.core.security import (
     hash_password, verify_password,
@@ -31,6 +32,7 @@ from app.core.security import (
 )
 from app.core.config import settings
 from app.middleware.rate_limit import check_register_limit
+from app.services.email_service import send_password_reset_email
 
 logger = logging.getLogger("anoncampus.auth")
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -237,7 +239,7 @@ async def forgot_password(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Generate password reset token.
+    Generate password reset token and dispatch email via SMTP (if configured).
     Generic response to prevent user enumeration.
     In development/non-production, returns reset_token & reset_url directly for testing.
     """
@@ -245,19 +247,61 @@ async def forgot_password(
     user = result.scalar_one_or_none()
 
     response_data = {
-        "message": "If this email is registered, a password reset link has been sent.",
+        "message": "If this email is registered, a password reset link has been dispatched.",
+        "email_sent": False,
     }
 
     if user and user.is_active:
         token = create_password_reset_token(user.email)
+        # Attempt delivery via SMTP
+        email_sent = await send_password_reset_email(user.email, token)
+        response_data["email_sent"] = email_sent
+
+        if email_sent:
+            response_data["message"] = f"A password reset link has been sent to {user.email}."
+
         if settings.ENVIRONMENT != "production":
             response_data["reset_token"] = token
             response_data["reset_url"] = f"/auth/reset-password?token={token}"
-            logger.info(f"Password reset token generated for {user.email}: {token}")
+            logger.info(f"Password reset token generated for {user.email}: {token} (SMTP delivered: {email_sent})")
         else:
-            logger.info(f"Password reset triggered for {user.email}")
+            logger.info(f"Password reset triggered for {user.email} (SMTP delivered: {email_sent})")
 
     return response_data
+
+
+@router.post("/reset-password-student-credentials")
+async def reset_password_by_student_credentials(
+    payload: StudentCredentialResetRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Alternative password recovery for students when college domain email
+    delivery is blocked, delayed, or unreachable.
+    Validates email + student_id + department + academic_year match.
+    """
+    result = await db.execute(
+        select(User).where(
+            User.email == payload.email.lower(),
+            User.student_id == payload.student_id.strip().upper(),
+            User.department == payload.department.strip(),
+            User.academic_year == payload.academic_year,
+            User.is_active == True,
+        )
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Student credentials do not match our records",
+        )
+
+    user.hashed_password = hash_password(payload.new_password)
+    await revoke_all_user_tokens(db, user.id, reason="student_credential_reset")
+    await db.commit()
+
+    logger.info(f"Password reset via verified student credentials for user id={user.id}")
+    return {"message": "Password reset successfully. You can now sign in with your new password."}
 
 
 @router.post("/reset-password")
