@@ -175,41 +175,44 @@ def decode_token(token: str, expected_type: str = "access") -> dict:
 
 # ── Login lockout ─────────────────────────────────────────────────────────────
 
+def _get_redis_client():
+    import redis as redis_sync
+    return redis_sync.from_url(settings.REDIS_URL, decode_responses=True, socket_timeout=1)
+
+
 def check_login_lockout(ip: str) -> None:
     """
-    10 failed attempts in 15 min → block for 15 min.
-    Uses Redis. Fail-open if Redis unavailable.
+    Check if IP is currently locked out or has exceeded 10 failed attempts.
+    Does NOT increment failure count. Fail-open if Redis is unavailable.
     """
     try:
-        import redis as redis_sync
         import time
-        r = redis_sync.from_url(settings.REDIS_URL, decode_responses=True)
+        r = _get_redis_client()
 
         lockout_key = f"lockout:{ip}"
         fail_key = f"rl:login:{ip}"
 
-        # Check if IP is locked out
+        # 1. Check if IP is explicitly locked out
         if r.exists(lockout_key):
             ttl = r.ttl(lockout_key)
+            if ttl <= 0:
+                ttl = 900
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail={"error": "account_locked", "retry_after_seconds": ttl},
                 headers={"Retry-After": str(ttl)},
             )
 
-        # Sliding window count
+        # 2. Check sliding window failure count
         now = time.time()
         window = 900  # 15 min
         pipe = r.pipeline()
         pipe.zremrangebyscore(fail_key, "-inf", now - window)
-        pipe.zadd(fail_key, {str(now): now})
         pipe.zcard(fail_key)
-        pipe.expire(fail_key, window + 1)
         results = pipe.execute()
-        count = results[2]
+        count = results[1]
 
-        if count > 10:
-            # Engage lockout
+        if count >= 10:
             r.setex(lockout_key, window, "1")
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -218,15 +221,40 @@ def check_login_lockout(ip: str) -> None:
             )
     except HTTPException:
         raise
-    except Exception:
-        pass  # fail-open
+    except Exception as e:
+        logger.debug(f"Redis lockout check bypassed (fail-open): {e}")
+
+
+def record_login_failure(ip: str) -> None:
+    """Record a failed login attempt for the given IP in the sliding window."""
+    try:
+        import time
+        r = _get_redis_client()
+
+        fail_key = f"rl:login:{ip}"
+        lockout_key = f"lockout:{ip}"
+        now = time.time()
+        window = 900  # 15 min
+
+        pipe = r.pipeline()
+        pipe.zremrangebyscore(fail_key, "-inf", now - window)
+        member = f"{now:.6f}"
+        pipe.zadd(fail_key, {member: now})
+        pipe.zcard(fail_key)
+        pipe.expire(fail_key, window + 1)
+        results = pipe.execute()
+        count = results[2]
+
+        if count >= 10:
+            r.setex(lockout_key, window, "1")
+    except Exception as e:
+        logger.debug(f"Failed to record login failure (fail-open): {e}")
 
 
 def clear_login_failures(ip: str) -> None:
-    """Clear failure count on successful login"""
+    """Clear failure count and lockout status on successful login"""
     try:
-        import redis as redis_sync
-        r = redis_sync.from_url(settings.REDIS_URL, decode_responses=True)
+        r = _get_redis_client()
         r.delete(f"rl:login:{ip}", f"lockout:{ip}")
     except Exception:
         pass

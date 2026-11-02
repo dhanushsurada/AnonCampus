@@ -39,6 +39,14 @@ MIN_TITLE = 10
 MAX_TITLE = 500
 
 
+def strip_html_and_scripts(text: str) -> str:
+    """Strip script/style blocks and HTML tags to prevent XSS / injection"""
+    text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.IGNORECASE | re.DOTALL)
+    text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.IGNORECASE | re.DOTALL)
+    text = re.sub(r'<[^>]+>', '', text)
+    return text.strip()
+
+
 def moderate_text(title: str, body: str) -> Tuple[bool, List[str], str, str]:
     """
     Returns (is_clean, flags, cleaned_title, cleaned_body).
@@ -46,8 +54,8 @@ def moderate_text(title: str, body: str) -> Tuple[bool, List[str], str, str]:
     PII/accusation flags are informational — content is auto-redacted but not blocked.
     """
     flags: List[str] = []
-    cleaned_title = title.strip()
-    cleaned_body = body.strip()
+    cleaned_title = strip_html_and_scripts(title)
+    cleaned_body = strip_html_and_scripts(body)
 
     # Layer 1: PII detection and redaction
     for pattern, pii_type in PII_PATTERNS:

@@ -100,6 +100,10 @@ def cosine_score(vec_a: List[float], vec_b: List[float]) -> float:
         return 0.0
 
 
+# Backward compatibility alias
+cosine_similarity_score = cosine_score
+
+
 def jaccard_similarity(text_a: str, text_b: str) -> float:
     """Fallback when embeddings unavailable"""
     words_a = set(re.findall(r'\w+', text_a.lower()))
@@ -107,6 +111,10 @@ def jaccard_similarity(text_a: str, text_b: str) -> float:
     if not words_a or not words_b:
         return 0.0
     return len(words_a & words_b) / len(words_a | words_b)
+
+
+# Backward compatibility alias
+tfidf_similarity = jaccard_similarity
 
 
 def determine_cluster_action(

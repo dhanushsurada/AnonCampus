@@ -85,7 +85,8 @@ async def submit_issue(
     )
 
     # ── ALL WRITES IN ONE ATOMIC TRANSACTION ──────────────────────────────────
-    async with db.begin():
+    tx_cm = db.begin_nested() if db.in_transaction() else db.begin()
+    async with tx_cm:
         cluster_id: Optional[int] = None
         cluster_event = EventType.CLUSTER_ASSIGNED
 
@@ -160,42 +161,57 @@ async def submit_issue(
         await log_event(db, user.institution_id, cluster_event,
                         cluster_id=cluster_id, actor_id=user.id,
                         payload={"action": action, "similarity": round(sim_score, 4)})
-    # ── END TRANSACTION ───────────────────────────────────────────────────────
 
-    await db.refresh(issue)
-
-    # Idempotency storage (separate small write, after main tx commits)
-    if idempotency_key:
-        from app.middleware.rate_limit import store_idempotency
-        async with db.begin():
+        if idempotency_key:
+            from app.middleware.rate_limit import store_idempotency
             await store_idempotency(db, idempotency_key, user.id,
                                     "submit_issue", 201, {"issue_id": issue.id})
+
+    # ── END TRANSACTION ───────────────────────────────────────────────────────
+    await db.commit()
+    await db.refresh(issue)
 
     # Trigger async score recompute (fire-and-forget, outside tx)
     _trigger_score(cluster_id)
     return issue
 
 
+async def _resolve_issue(db: AsyncSession, target_id: int, institution_id: int) -> Optional[Issue]:
+    """Resolve target_id as either an issue_id or primary issue of cluster_id"""
+    issue = await db.get(Issue, target_id)
+    if issue and issue.institution_id == institution_id:
+        return issue
+    # Fallback: check if target_id is cluster_id
+    cluster = await db.get(Cluster, target_id)
+    if cluster and cluster.institution_id == institution_id:
+        result = await db.execute(
+            select(Issue).where(Issue.cluster_id == cluster.id).order_by(Issue.id).limit(1)
+        )
+        return result.scalar_one_or_none()
+    return None
+
+
 # ── Support — atomic ──────────────────────────────────────────────────────────
 
 async def add_support(db: AsyncSession, issue_id: int, user: User) -> bool:
-    # Pre-check (no lock needed for read)
-    issue = await db.get(Issue, issue_id)
-    if not issue or issue.institution_id != user.institution_id:
+    issue = await _resolve_issue(db, issue_id, user.institution_id)
+    if not issue:
         return False
 
     existing = await db.execute(
-        select(Vote).where(and_(Vote.issue_id == issue_id, Vote.voter_id == user.id))
+        select(Vote).where(and_(Vote.issue_id == issue.id, Vote.voter_id == user.id))
     )
     if existing.scalar_one_or_none():
         return False
 
-    async with db.begin():
-        vote = Vote(issue_id=issue_id, voter_id=user.id, institution_id=user.institution_id)
+    tx_cm = db.begin_nested() if db.in_transaction() else db.begin()
+    async with tx_cm:
+        vote = Vote(issue_id=issue.id, voter_id=user.id, institution_id=user.institution_id)
         db.add(vote)
         await log_event(db, user.institution_id, EventType.SUPPORT_ADDED,
                         cluster_id=issue.cluster_id, actor_id=user.id,
-                        payload={"issue_id": issue_id})
+                        payload={"issue_id": issue.id})
+    await db.commit()
 
     _trigger_score(issue.cluster_id)
     return True
@@ -204,13 +220,13 @@ async def add_support(db: AsyncSession, issue_id: int, user: User) -> bool:
 # ── Context — atomic ──────────────────────────────────────────────────────────
 
 async def add_context(db: AsyncSession, issue_id: int, user: User, context_text: str) -> bool:
-    issue = await db.get(Issue, issue_id)
-    if not issue or issue.institution_id != user.institution_id:
+    issue = await _resolve_issue(db, issue_id, user.institution_id)
+    if not issue:
         return False
 
     existing = await db.execute(
         select(Report).where(and_(
-            Report.issue_id == issue_id,
+            Report.issue_id == issue.id,
             Report.reporter_id == user.id,
             Report.signal_type == "context",
         ))
@@ -218,9 +234,10 @@ async def add_context(db: AsyncSession, issue_id: int, user: User, context_text:
     if existing.scalar_one_or_none():
         return False
 
-    async with db.begin():
+    tx_cm = db.begin_nested() if db.in_transaction() else db.begin()
+    async with tx_cm:
         report = Report(
-            issue_id=issue_id, reporter_id=user.id, institution_id=user.institution_id,
+            issue_id=issue.id, reporter_id=user.id, institution_id=user.institution_id,
             signal_type="context", context_text=context_text,
             reporter_department=user.department, reporter_year=user.academic_year,
             reporter_trust_at_time=user.trust_score,
@@ -228,7 +245,8 @@ async def add_context(db: AsyncSession, issue_id: int, user: User, context_text:
         db.add(report)
         await log_event(db, user.institution_id, EventType.CONTEXT_ADDED,
                         cluster_id=issue.cluster_id, actor_id=user.id,
-                        payload={"issue_id": issue_id})
+                        payload={"issue_id": issue.id})
+    await db.commit()
 
     _trigger_score(issue.cluster_id)
     return True
@@ -237,19 +255,20 @@ async def add_context(db: AsyncSession, issue_id: int, user: User, context_text:
 # ── Feedback — atomic ─────────────────────────────────────────────────────────
 
 async def submit_feedback(db: AsyncSession, issue_id: int, user: User, payload: FeedbackCreate) -> bool:
-    issue = await db.get(Issue, issue_id)
-    if not issue or issue.institution_id != user.institution_id:
+    issue = await _resolve_issue(db, issue_id, user.institution_id)
+    if not issue:
         return False
 
     existing = await db.execute(
-        select(Feedback).where(and_(Feedback.issue_id == issue_id, Feedback.user_id == user.id))
+        select(Feedback).where(and_(Feedback.issue_id == issue.id, Feedback.user_id == user.id))
     )
     if existing.scalar_one_or_none():
         return False
 
-    async with db.begin():
+    tx_cm = db.begin_nested() if db.in_transaction() else db.begin()
+    async with tx_cm:
         feedback = Feedback(
-            issue_id=issue_id, user_id=user.id, institution_id=user.institution_id,
+            issue_id=issue.id, user_id=user.id, institution_id=user.institution_id,
             sentiment=payload.sentiment, rating=payload.rating, comment=payload.comment,
         )
         db.add(feedback)
@@ -257,7 +276,8 @@ async def submit_feedback(db: AsyncSession, issue_id: int, user: User, payload: 
         user.trust_score = score_svc.update_trust_score(user.trust_score, trust_event)
         await log_event(db, user.institution_id, EventType.FEEDBACK_SUBMITTED,
                         cluster_id=issue.cluster_id, actor_id=user.id,
-                        payload={"issue_id": issue_id, "sentiment": payload.sentiment})
+                        payload={"issue_id": issue.id, "sentiment": payload.sentiment})
+    await db.commit()
     return True
 
 
@@ -270,7 +290,8 @@ async def admin_update_status(db: AsyncSession, payload: AdminStatusUpdate, admi
     """
     from fastapi import HTTPException
 
-    async with db.begin():
+    tx_cm = db.begin_nested() if db.in_transaction() else db.begin()
+    async with tx_cm:
         # CONCURRENCY: lock cluster row
         locked = await db.execute(
             select(Cluster)
@@ -315,6 +336,7 @@ async def admin_update_status(db: AsyncSession, payload: AdminStatusUpdate, admi
                         payload={"action": "status_update", "old": old_status, "new": payload.new_status,
                                  "reason": payload.reason})
 
+    await db.commit()
     await db.refresh(cluster)
     return cluster
 

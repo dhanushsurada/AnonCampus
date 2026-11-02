@@ -177,13 +177,17 @@ def _do_recompute(cluster_id: int, settings, redis_client):
             cluster_obj.status = "active"
 
         # SLA breach check — persist sla_breached_at (spec F)
-        if (cluster_obj.sla_deadline and
-                cluster_obj.sla_deadline < now and
+        sla_deadline = cluster_obj.sla_deadline
+        if sla_deadline and sla_deadline.tzinfo is None:
+            sla_deadline = sla_deadline.replace(tzinfo=timezone.utc)
+
+        if (sla_deadline and
+                sla_deadline < now and
                 cluster_obj.status not in ("resolved", "archived") and
                 cluster_obj.sla_status != "breached"):
             cluster_obj.sla_status = "breached"
             cluster_obj.sla_breached_at = now
-            log_sla_breach(cluster_id, cluster_obj.institution_id, cluster_obj.sla_deadline.isoformat())
+            log_sla_breach(cluster_id, cluster_obj.institution_id, sla_deadline.isoformat())
 
         db.commit()
         log_score_computed(cluster_id, confidence, cluster_obj.is_escalated)

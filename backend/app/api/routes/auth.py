@@ -22,7 +22,7 @@ from app.core.security import (
     hash_password, verify_password,
     create_access_token, create_refresh_token, decode_token,
     store_refresh_token, revoke_refresh_token, revoke_all_user_tokens,
-    check_login_lockout, clear_login_failures,
+    check_login_lockout, record_login_failure, clear_login_failures,
     get_current_user,
 )
 from app.middleware.rate_limit import check_register_limit
@@ -124,8 +124,7 @@ async def login(
 
     # Constant-time comparison — don't leak user existence via timing
     if not user or not verify_password(payload.password, user.hashed_password):
-        # Failure is logged by lockout mechanism via Redis increment
-        check_login_lockout(client_ip)  # increments failure count
+        record_login_failure(client_ip)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
     if not user.is_active:

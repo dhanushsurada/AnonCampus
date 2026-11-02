@@ -159,6 +159,48 @@ async def give_feedback(
     return {"message": "Feedback recorded"}
 
 
+@router.get("/clusters/{cluster_id}", response_model=ClusterDetailResponse)
+async def get_cluster_by_id(
+    cluster_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    cluster = await db.get(Cluster, cluster_id)
+    if not cluster or cluster.institution_id != current_user.institution_id:
+        raise HTTPException(status_code=404, detail="Cluster not found")
+
+    issue_count = (await db.execute(
+        select(func.count()).where(Issue.cluster_id == cluster_id)
+    )).scalar() or 0
+
+    explanation = ScoreExplanation(
+        confidence=cluster.confidence_score,
+        diversity_valid=cluster.diversity_valid,
+        escalated=cluster.is_escalated,
+        escalation_type=cluster.escalation_type,
+        reason={
+            "reports": cluster.report_count,
+            "supports": cluster.support_count,
+            "contexts": cluster.context_count,
+            "diversity": (
+                f"valid ({len(cluster.departments_involved)} depts, "
+                f"{len(cluster.years_involved)} years)"
+                if cluster.diversity_valid
+                else "insufficient cross-department diversity"
+            ),
+            "severity": cluster.severity,
+            "scope": cluster.scope,
+        },
+    )
+
+    return ClusterDetailResponse(
+        **ClusterResponse.model_validate(cluster).model_dump(),
+        explanation=explanation,
+        timeline=[],
+        issue_count=issue_count,
+    )
+
+
 @router.get("/{issue_id}/cluster")
 async def get_issue_cluster(
     issue_id: int,
@@ -166,9 +208,15 @@ async def get_issue_cluster(
     current_user: User = Depends(get_current_user),
 ):
     issue = await db.get(Issue, issue_id)
-    if not issue or issue.institution_id != current_user.institution_id:
-        raise HTTPException(status_code=404, detail="Issue not found")
-    if not issue.cluster_id:
-        return {"cluster": None}
-    cluster = await db.get(Cluster, issue.cluster_id)
-    return {"cluster": ClusterResponse.model_validate(cluster) if cluster else None}
+    if issue and issue.institution_id == current_user.institution_id:
+        if not issue.cluster_id:
+            return {"cluster": None}
+        cluster = await db.get(Cluster, issue.cluster_id)
+        return {"cluster": ClusterResponse.model_validate(cluster) if cluster else None}
+
+    # Fallback: maybe issue_id is actually cluster_id (from frontend issue link)
+    cluster = await db.get(Cluster, issue_id)
+    if cluster and cluster.institution_id == current_user.institution_id:
+        return {"cluster": ClusterResponse.model_validate(cluster)}
+
+    raise HTTPException(status_code=404, detail="Issue or cluster not found")

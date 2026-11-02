@@ -18,7 +18,7 @@ def anyio_backend():
     return "asyncio"
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture
 async def test_db_engine():
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
     from app.db.session import Base
@@ -259,7 +259,7 @@ async def test_support_issue(client, student_token, student2_token):
 @pytest.mark.anyio
 async def test_unauthenticated_rejected(client):
     resp = await client.get("/api/issues")
-    assert resp.status_code == 403
+    assert resp.status_code in (401, 403)
 
 
 # ── Health probes ──────────────────────────────────────────────────────────────

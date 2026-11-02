@@ -66,6 +66,18 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"],
 )
 
+# Security headers middleware
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    if settings.ENVIRONMENT == "production":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
 # Routers
 app.include_router(auth.router,   prefix="/api")
 app.include_router(issues.router, prefix="/api")
@@ -122,12 +134,17 @@ async def root():
 
 async def _seed_defaults():
     """
-    Creates a demo institution and super-admin on first run.
+    Creates a demo institution, admin, and demo student with sample clusters on first run.
     Only called when ENVIRONMENT != production.
-    Default credentials: admin@nsrit.edu.in / Admin1234
+    Default credentials:
+      admin@nsrit.edu.in / Admin1234
+      student@nsrit.edu.in / Admin1234
     """
+    from datetime import datetime, timezone, timedelta
     from app.db.session import AsyncSessionLocal
     from app.models.user import Institution, User
+    from app.models.cluster import Cluster
+    from app.models.issue import Issue
     from app.core.security import hash_password
     from sqlalchemy import select
 
@@ -157,5 +174,57 @@ async def _seed_defaults():
             academic_year=1,
         )
         db.add(admin_user)
+
+        student_user = User(
+            email="student@nsrit.edu.in",
+            hashed_password=hash_password("Admin1234"),
+            student_id="22NU1A0501",
+            role="student",
+            institution_id=inst.id,
+            is_verified=True,
+            department="CSE",
+            academic_year=3,
+        )
+        db.add(student_user)
+        await db.flush()
+
+        # Seed initial demo clusters for realistic showcase
+        cluster1 = Cluster(
+            institution_id=inst.id,
+            title="Wi-Fi connectivity failure across central library & CSE labs",
+            summary="Multiple students reporting sustained network outages in Lab 3 and 4 during practical exam hours.",
+            category="infrastructure",
+            status="active",
+            severity=0.75,
+            confidence_score=0.82,
+            visibility_score=0.88,
+            diversity_score=0.65,
+            diversity_valid=True,
+            is_escalated=False,
+            report_count=8,
+            support_count=15,
+            context_count=3,
+            scope=0.6,
+            departments_involved=["CSE", "ECE", "IT"],
+            years_involved=[2, 3, 4],
+            sla_deadline=datetime.now(timezone.utc) + timedelta(hours=48),
+        )
+        db.add(cluster1)
+        await db.flush()
+
+        issue1 = Issue(
+            institution_id=inst.id,
+            cluster_id=cluster1.id,
+            title="Wi-Fi connectivity failure across central library & CSE labs",
+            body="Internet connection drops every 10 minutes in Lab 3. We cannot load compiler tools or submit labs.",
+            category="infrastructure",
+            status="active",
+            severity=0.75,
+            is_moderated=True,
+            submitter_department="CSE",
+            submitter_year=3,
+        )
+        db.add(issue1)
+
         await db.commit()
-        logger.info("Dev seed complete — admin@nsrit.edu.in / Admin1234")
+        logger.info("Dev seed complete — admin@nsrit.edu.in & student@nsrit.edu.in / Admin1234")

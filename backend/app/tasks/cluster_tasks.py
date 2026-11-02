@@ -36,12 +36,12 @@ def daily_recluster(self):
 
             # Check for clusters that can be merged (same institution, same category)
             from sqlalchemy import text
-            institutions = db.execute(text("SELECT DISTINCT institution_id FROM clusters WHERE status != 'ARCHIVED'")).fetchall()
+            institutions = db.execute(text("SELECT DISTINCT institution_id FROM clusters WHERE status != 'archived'")).fetchall()
             
             for (inst_id,) in institutions:
                 clusters = db.query(Cluster).filter(
                     Cluster.institution_id == inst_id,
-                    Cluster.status.notin_(["ARCHIVED"]),
+                    Cluster.status.notin_(["archived"]),
                     Cluster.centroid_embedding.isnot(None)
                 ).all()
 
@@ -62,7 +62,7 @@ def daily_recluster(self):
                                 db.query(Issue).filter(Issue.cluster_id == c2.id).update(
                                     {"cluster_id": c1.id}
                                 )
-                                c2.status = "ARCHIVED"
+                                c2.status = "archived"
                                 # Update centroid
                                 total = c1.report_count + c2.report_count
                                 if total > 0 and c2.centroid_embedding:
@@ -102,21 +102,21 @@ def check_dormant_clusters(self):
             seven_days_ago = now - timedelta(days=7)
             thirty_days_ago = now - timedelta(days=30)
 
-            # ACTIVE → DORMANT: no activity in 7 days
+            # active → dormant: no activity in 7 days
             active_stale = db.query(Cluster).filter(
-                Cluster.status == "ACTIVE",
+                Cluster.status == "active",
                 Cluster.last_activity_at < seven_days_ago
             ).all()
             for c in active_stale:
-                c.status = "DORMANT"
+                c.status = "dormant"
 
-            # DORMANT → ARCHIVED: no activity in 30 days
+            # dormant → archived: no activity in 30 days
             dormant_old = db.query(Cluster).filter(
-                Cluster.status == "DORMANT",
+                Cluster.status == "dormant",
                 Cluster.last_activity_at < thirty_days_ago
             ).all()
             for c in dormant_old:
-                c.status = "ARCHIVED"
+                c.status = "archived"
 
             db.commit()
 

@@ -18,13 +18,13 @@ export default function IssueDetailPage() {
   const qc = useQueryClient()
   const [feedbackSent, setFeedbackSent] = useState(false)
 
-  const { data: clusterData } = useQuery({
+  const { data: clusterData, isLoading, isError } = useQuery({
     queryKey: ['issue-cluster', id],
     queryFn: () => issuesApi.getCluster(Number(id)).then(r => r.data),
     enabled: !!id && !!user,
   })
 
-  const cluster = clusterData?.cluster
+  const cluster = clusterData?.cluster ?? (clusterData?.id ? clusterData : null)
 
   const { data: adminDetail } = useQuery({
     queryKey: ['admin-cluster', id],
@@ -35,21 +35,33 @@ export default function IssueDetailPage() {
   const supportMut = useMutation({
     mutationFn: () => issuesApi.support(Number(id)),
     onSuccess: () => { toast.success('Support recorded'); qc.invalidateQueries({ queryKey: ['issue-cluster', id] }) },
-    onError: () => toast.error('Already supported'),
+    onError: () => toast.error('Already supported or issue not found'),
   })
 
   const feedbackMut = useMutation({
     mutationFn: (sentiment: string) => issuesApi.feedback(Number(id), { sentiment }),
     onSuccess: () => { toast.success('Feedback submitted'); setFeedbackSent(true) },
+    onError: () => toast.error('Feedback submission failed'),
   })
 
-  if (!cluster) return (
+  if (isLoading) return (
     <div className="min-h-screen bg-[#080A0F] flex items-center justify-center text-[#64748B]">
-      Loading...
+      Loading cluster details...
     </div>
   )
 
-  const explanation = adminDetail?.explanation
+  if (isError || !cluster) return (
+    <div className="min-h-screen bg-[#080A0F] flex flex-col items-center justify-center p-4 text-center">
+      <AlertTriangle className="text-[#FF4444] mb-3" size={32} />
+      <h2 className="text-lg font-bold mb-1">Issue Cluster Not Found</h2>
+      <p className="text-sm text-[#64748B] mb-4">This cluster may have been merged or removed.</p>
+      <Link href="/dashboard" className="btn-primary text-sm py-2 px-4">
+        Back to Dashboard
+      </Link>
+    </div>
+  )
+
+  const explanation = clusterData?.explanation ?? adminDetail?.explanation
   const timeline = adminDetail?.timeline ?? []
   const slaOverdue = cluster.sla_deadline && new Date(cluster.sla_deadline) < new Date()
 
