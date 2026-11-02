@@ -46,52 +46,52 @@ export function SubmitModal({ onClose }: { onClose: () => void }) {
       <div className="relative z-10 w-full max-w-lg card p-6 animate-slide-up">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h2 className="font-semibold text-base">Submit anonymous issue</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Your identity is never stored or exposed</p>
+            <h2 className="font-semibold text-base text-white">Report an Issue Anonymously</h2>
+            <p className="text-xs text-[#64748B] mt-0.5">100% Anonymous · Your name and roll number are never exposed</p>
           </div>
-          <button onClick={onClose} className="text-slate-500 hover:text-white"><X size={16}/></button>
+          <button onClick={onClose} className="text-[#64748B] hover:text-white"><X size={16}/></button>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <label className="text-xs text-slate-400 block mb-1.5">Issue title</label>
-            <input {...register('title')} className="input" placeholder="Brief description of the problem…" />
-            {errors.title && <p className="text-signal-red text-xs mt-1 flex items-center gap-1"><AlertCircle size={11}/>{errors.title.message}</p>}
+            <label className="text-xs text-[#94A3B8] block mb-1.5">What is the problem?</label>
+            <input {...register('title')} className="input" placeholder="e.g. AC broken in Lab Block C, Water cooler leaking on 2nd floor…" />
+            {errors.title && <p className="text-[#FF4444] text-xs mt-1 flex items-center gap-1"><AlertCircle size={11}/>{errors.title.message}</p>}
           </div>
 
           <div>
-            <label className="text-xs text-slate-400 block mb-1.5">Details</label>
+            <label className="text-xs text-[#94A3B8] block mb-1.5">Describe what is happening</label>
             <textarea {...register('body')} rows={5} className="input resize-none"
-              placeholder="Describe the issue in detail. Do not include names or personal identifiers." />
+              placeholder="Tell us what is happening, exact room/block, and how students are affected. Do not worry about formatting." />
             <div className="flex justify-between mt-1">
-              {errors.body ? <p className="text-signal-red text-xs flex items-center gap-1"><AlertCircle size={11}/>{errors.body.message}</p> : <span/>}
-              <span className="text-xs text-slate-600">{bodyLen}/5000</span>
+              {errors.body ? <p className="text-[#FF4444] text-xs flex items-center gap-1"><AlertCircle size={11}/>{errors.body.message}</p> : <span/>}
+              <span className="text-xs text-[#64748B]">{bodyLen}/5000</span>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-slate-400 block mb-1.5">Category</label>
-              <select {...register('category')} className="input">
+              <label className="text-xs text-[#94A3B8] block mb-1.5">Category</label>
+              <select {...register('category')} className="input capitalize">
                 {CATEGORIES.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs text-slate-400 block mb-1.5">Severity (optional)</label>
+              <label className="text-xs text-[#94A3B8] block mb-1.5">Urgency Level</label>
               <select {...register('severity')} className="input">
-                <option value="">Auto-detect</option>
-                <option value="0.3">Low</option>
-                <option value="0.6">Medium</option>
-                <option value="0.85">High</option>
-                <option value="1.0">Critical</option>
+                <option value="">Auto-detected by AI</option>
+                <option value="0.3">🟢 Low Priority</option>
+                <option value="0.6">🟡 Medium Priority</option>
+                <option value="0.85">🔴 High / Urgent</option>
+                <option value="1.0">🚨 Critical Emergency</option>
               </select>
             </div>
           </div>
 
           <div className="flex gap-3 pt-1">
-            <button type="button" onClick={onClose} className="btn-ghost flex-1">Cancel</button>
-            <button type="submit" disabled={loading} className="btn-primary flex-1 flex items-center justify-center gap-2">
-              {loading ? 'Submitting…' : <><Send size={13}/>Submit anonymously</>}
+            <button type="button" onClick={onClose} className="btn-ghost flex-1 text-xs">Cancel</button>
+            <button type="submit" disabled={loading} className="btn-primary flex-1 flex items-center justify-center gap-2 text-xs">
+              {loading ? 'Submitting…' : <><Send size={13}/>Post Issue Anonymously</>}
             </button>
           </div>
         </form>

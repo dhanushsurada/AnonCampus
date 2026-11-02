@@ -19,9 +19,9 @@ import { useRouter } from 'next/navigation'
 
 const FEEDS = [
   { key: undefined,  label: 'All Activity' },
-  { key: 'new',      label: 'New' },
-  { key: 'active',   label: 'Active' },
-  { key: 'trending', label: 'Trending' },
+  { key: 'trending', label: '🔥 Trending' },
+  { key: 'active',   label: '🛠️ In Progress' },
+  { key: 'new',      label: '✨ Fresh Reports' },
 ]
 
 const CATEGORIES = [
@@ -91,8 +91,11 @@ export default function DashboardPage() {
             <div className="text-xs text-[#64748B] hidden sm:block">
               {user?.department} · Year {user?.academic_year}
             </div>
-            <div className="text-xs font-mono px-2 py-1 rounded bg-[#1C2333] text-[#94A3B8]">
-              Trust: {user?.trust_score?.toFixed(2) ?? '1.00'}
+            <div
+              className="text-xs font-mono px-2 py-1 rounded bg-[#1C2333] text-[#00FF88] border border-[#00FF88]/20 flex items-center gap-1"
+              title="Your campus voice credibility rating — earned through honest reporting and community backing"
+            >
+              <span>⭐ Credibility:</span> {user?.trust_score?.toFixed(2) ?? '1.00'}
             </div>
             {(user?.role === 'admin' || user?.role === 'super_admin') && (
               <Link href="/admin" className="text-[#FFB800] hover:text-[#FFB800]/80 transition-colors" title="Admin Portal">
@@ -121,16 +124,16 @@ export default function DashboardPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Student Grievance Portal</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Campus Voice & Issues</h1>
             <p className="text-[#64748B] text-sm mt-1">
-              Anonymous corroboration & collective voice for campus issues
+              Speak up anonymously, upvote campus problems, and track college fixes in real time
             </p>
           </div>
           <button
             onClick={() => setShowModal(true)}
             className="btn-primary flex items-center gap-2 shrink-0 self-start sm:self-auto"
           >
-            <Plus size={15} /> Submit Issue
+            <Plus size={15} /> Report an Issue
           </button>
         </div>
 
@@ -144,7 +147,7 @@ export default function DashboardPage() {
                 : 'text-[#64748B] border-transparent hover:text-white'
             }`}
           >
-            <Layers size={15} /> Campus Issues
+            <Layers size={15} /> Trending Campus Issues
             <span className="text-xs px-1.5 py-0.5 rounded-full bg-[#1C2333] text-[#94A3B8]">
               {clusterData?.total ?? clusters.length}
             </span>
@@ -157,7 +160,7 @@ export default function DashboardPage() {
                 : 'text-[#64748B] border-transparent hover:text-white'
             }`}
           >
-            <FileText size={15} /> My Submissions
+            <FileText size={15} /> My Reported Issues
             {myIssuesData && (
               <span className="text-xs px-1.5 py-0.5 rounded-full bg-[#1C2333] text-[#94A3B8]">
                 {myIssuesData.total}
@@ -293,16 +296,16 @@ export default function DashboardPage() {
               <div className="card p-12 text-center text-[#64748B]">
                 <FileText size={32} className="mx-auto mb-3 opacity-30 text-[#00D4FF]" />
                 <h3 className="text-base font-semibold text-[#94A3B8] mb-1">
-                  No issues submitted yet
+                  You haven't reported any issues yet
                 </h3>
                 <p className="text-xs text-[#64748B] max-w-sm mx-auto mb-4">
-                  Issues you submit anonymously will appear here so you can track resolution status and cluster updates.
+                  Any issues you report anonymously will appear here so you can watch student upvotes and track when the college fixes them.
                 </p>
                 <button
                   onClick={() => setShowModal(true)}
                   className="btn-primary text-xs px-4 py-2 inline-flex items-center gap-1.5"
                 >
-                  <Plus size={14} /> Submit New Issue
+                  <Plus size={14} /> Report an Issue
                 </button>
               </div>
             ) : (
@@ -316,7 +319,7 @@ export default function DashboardPage() {
                           {issue.category}
                         </span>
                         <span className="text-xs text-[#64748B]">
-                          Submitted {fmtDate(issue.created_at)}
+                          Reported {fmtDate(issue.created_at)}
                         </span>
                       </div>
 
@@ -325,7 +328,7 @@ export default function DashboardPage() {
                           href={`/issues/${issue.cluster_id}`}
                           className="inline-flex items-center gap-1 text-xs text-[#00D4FF] hover:underline"
                         >
-                          View Cluster Activity <ArrowRight size={12} />
+                          View Campus Topic & Progress <ArrowRight size={12} />
                         </Link>
                       )}
                     </div>

@@ -137,7 +137,7 @@ export default function AdminDashboardPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Grievance Intelligence Dashboard</h1>
             <p className="text-[#64748B] text-sm mt-1">
-              Institution Governance & Automated Signal Triaging
+              Institution Administration & Issue Intelligence
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -152,7 +152,7 @@ export default function AdminDashboardPage() {
                   : 'text-[#64748B] hover:text-white border border-transparent'
               }`}
             >
-              Clusters & Grievances
+              Campus Issues & Topics
             </button>
             <button
               onClick={() => {
@@ -172,12 +172,12 @@ export default function AdminDashboardPage() {
 
         {/* Metrics */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-          <MetricCard label="Total Clusters" value={stats?.total_clusters} color="#00D4FF" icon={BarChart3} sub="All time" />
-          <MetricCard label="Active" value={stats?.active} color="#00FF88" icon={TrendingUp} sub="In progress" />
+          <MetricCard label="Campus Topics" value={stats?.total_clusters} color="#00D4FF" icon={BarChart3} sub="All time" />
+          <MetricCard label="In Progress" value={stats?.active} color="#00FF88" icon={TrendingUp} sub="Under active fix" />
           <MetricCard label="Escalated" value={stats?.escalated} color="#FFB800" icon={AlertTriangle} sub="Needs action" />
-          <MetricCard label="Resolved" value={stats?.resolved} color="#B44FFF" icon={CheckCircle} sub="Closed" />
-          <MetricCard label="SLA Breached" value={stats?.overdue_sla} color="#FF4444" icon={Clock} sub={`${slaBreachPct}% of total`} />
-          <MetricCard label="Issues" value={clustersData?.total ?? 0} color="#64748B" icon={FileText} sub="Tracked signals" />
+          <MetricCard label="Resolved" value={stats?.resolved} color="#B44FFF" icon={CheckCircle} sub="Closed & verified" />
+          <MetricCard label="Action Overdue" value={stats?.overdue_sla} color="#FF4444" icon={Clock} sub={`${slaBreachPct}% of total`} />
+          <MetricCard label="Student Reports" value={clustersData?.total ?? 0} color="#64748B" icon={FileText} sub="Total submissions" />
         </div>
 
         {activeTab === 'clusters' ? (

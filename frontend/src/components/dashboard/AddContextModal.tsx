@@ -53,19 +53,19 @@ export function AddContextModal({ issueId, onClose, onSuccess }: AddContextModal
             <FileText size={20} />
           </div>
           <div>
-            <h2 className="text-lg font-bold">Add Evidence & Context</h2>
-            <p className="text-xs text-[#64748B]">Provide supplementary details anonymously</p>
+            <h2 className="text-lg font-bold">Add Details & Evidence</h2>
+            <p className="text-xs text-[#64748B]">Provide more facts or photos/timings anonymously</p>
           </div>
         </div>
 
         <p className="text-xs text-[#94A3B8] mb-4 leading-relaxed">
-          Adding factual details, timestamps, exact locations, or impact descriptions helps corroborate this grievance and accelerate administration response time.
+          Sharing exact locations (e.g. Room 302, Library 2nd floor), timings, or specific equipment tags helps verify this issue and gets it resolved faster by college administration.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <div className="flex justify-between items-center mb-1.5">
-              <label className="text-xs text-[#94A3B8]">Additional Information / Evidence</label>
+              <label className="text-xs text-[#94A3B8]">Additional Observations / Details</label>
               <span className={`text-[11px] font-mono ${contextText.length > 1000 ? 'text-[#FF4444]' : 'text-[#64748B]'}`}>
                 {contextText.length}/1000
               </span>

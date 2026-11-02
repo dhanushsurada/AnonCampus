@@ -8,17 +8,17 @@ import { useAuthStore } from '@/lib/store'
 import toast from 'react-hot-toast'
 
 const FEATURES = [
-  { icon: Lock, label: 'Fully Anonymous', desc: 'No names, no IDs exposed. Ever.' },
-  { icon: Signal, label: 'Signal Processing', desc: 'Raw complaints become structured evidence.' },
-  { icon: Users, label: 'Diversity-Gated', desc: 'Cross-department validation prevents abuse.' },
-  { icon: BarChart3, label: 'Confidence Scoring', desc: 'Every issue ranked by mathematical certainty.' },
+  { icon: Lock, label: '100% Anonymous', desc: 'No names or roll numbers exposed. Speak freely without fear.' },
+  { icon: Signal, label: 'AI Issue Grouping', desc: 'Similar reports merge into unified, high-momentum campus topics.' },
+  { icon: Users, label: 'Cross-Branch Voice', desc: 'When multiple departments upvote, issues escalate to top management.' },
+  { icon: BarChart3, label: 'Real Accountability', desc: 'Track every issue from reported to fixed with public status updates.' },
 ]
 
 const STEPS = [
-  { n: '01', title: 'Student submits', desc: 'Anonymous, moderated, categorised automatically.' },
-  { n: '02', title: 'System clusters', desc: 'Similar issues merge. Signals accumulate.' },
-  { n: '03', title: 'Governance validates', desc: 'Diversity + threshold rules gate escalation.' },
-  { n: '04', title: 'Admin acts', desc: 'Ranked, timed, explainable decisions.' },
+  { n: '01', title: 'Post Anonymously', desc: 'Report any campus problem with zero risk of exposure or retaliation.' },
+  { n: '02', title: 'Students Upvote', desc: 'Peers across branches back the issue to build verified campus momentum.' },
+  { n: '03', title: 'Auto-Escalation', desc: 'AI verifies cross-department impact and escalates directly to leadership.' },
+  { n: '04', title: 'Track Resolution', desc: 'Watch management take action with transparent status updates and timers.' },
 ]
 
 export default function LandingPage() {
@@ -76,15 +76,14 @@ export default function LandingPage() {
       <section className="relative z-10 max-w-5xl mx-auto px-8 pt-24 pb-20 text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#00D4FF]/10 border border-[#00D4FF]/20 text-[#00D4FF] text-xs font-mono mb-8">
           <span className="w-1.5 h-1.5 rounded-full bg-[#00D4FF] animate-pulse" />
-          Signal processing platform for institutions
+          Campus Voice & Issue Resolution Platform
         </div>
         <h1 className="text-5xl md:text-6xl font-bold leading-[1.1] tracking-tight mb-6">
-          Turn anonymous complaints<br />
-          into <span className="text-gradient-cyan">actionable intelligence</span>
+          Speak up anonymously.<br />
+          Watch your campus <span className="text-gradient-cyan">actually fix it.</span>
         </h1>
         <p className="text-[#94A3B8] text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
-          AnonCampus converts raw student grievances into structured, diversity-validated,
-          scored signals — so institutions act on evidence, not noise.
+          AnonCampus unites students and college leadership. Report issues 100% anonymously, get backed by fellow students across branches, and hold management accountable in real time.
         </p>
         <div className="flex items-center justify-center gap-4 flex-wrap">
           <button

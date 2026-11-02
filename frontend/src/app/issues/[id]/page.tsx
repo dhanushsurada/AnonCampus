@@ -82,13 +82,14 @@ export default function IssueDetailPage() {
               <div className="flex flex-wrap gap-2 mb-3">
                 <StatusBadge status={cluster.status} />
                 {cluster.is_escalated && (
-                  <span className="badge badge-escalated">
-                    <AlertTriangle size={9} />{cluster.escalation_type?.toUpperCase()}
+                  <span className="badge badge-escalated flex items-center gap-1">
+                    <AlertTriangle size={10} />
+                    {cluster.escalation_type === 'override' ? 'URGENT ESCALATION 🔥' : 'ESCALATED TO ADMIN ⚡'}
                   </span>
                 )}
                 {slaOverdue && (
-                  <span className="badge bg-[#FF4444]/10 text-[#FF4444] border border-[#FF4444]/20">
-                    <Clock size={9} /> SLA BREACHED
+                  <span className="badge bg-[#FF4444]/10 text-[#FF4444] border border-[#FF4444]/20 flex items-center gap-1">
+                    <Clock size={10} /> ACTION OVERDUE
                   </span>
                 )}
               </div>
@@ -99,21 +100,21 @@ export default function IssueDetailPage() {
               <div className="text-3xl font-bold font-mono" style={{ color: confidenceColor(cluster.confidence_score) }}>
                 {Math.round(cluster.confidence_score * 100)}%
               </div>
-              <div className="text-xs text-[#64748B]">confidence</div>
+              <div className="text-xs text-[#64748B]">Impact Score</div>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4 mb-4">
-            <ScoreBar value={cluster.confidence_score} label="Confidence" color={confidenceColor(cluster.confidence_score)} />
-            <ScoreBar value={cluster.severity} label="Severity" color={severityColor(cluster.severity)} />
-            <ScoreBar value={cluster.diversity_score} label="Diversity" color="#B44FFF" />
-            <ScoreBar value={cluster.scope} label="Scope" color="#00D4FF" />
+            <ScoreBar value={cluster.confidence_score} label="Campus Momentum" color={confidenceColor(cluster.confidence_score)} />
+            <ScoreBar value={cluster.severity} label="Urgency Level" color={severityColor(cluster.severity)} />
+            <ScoreBar value={cluster.diversity_score} label="Cross-Branch Reach" color="#B44FFF" />
+            <ScoreBar value={cluster.scope} label="Impact Area" color="#00D4FF" />
           </div>
 
           <div className="flex items-center gap-6 text-sm text-[#94A3B8] mb-4">
-            <span className="flex items-center gap-1.5"><MessageSquare size={13}/>{cluster.report_count} reports</span>
-            <span className="flex items-center gap-1.5"><ThumbsUp size={13}/>{cluster.support_count} supports</span>
-            <span className="flex items-center gap-1.5"><Users size={13}/>{cluster.departments_involved.length} departments</span>
+            <span className="flex items-center gap-1.5"><MessageSquare size={13}/>{cluster.report_count} student reports</span>
+            <span className="flex items-center gap-1.5"><ThumbsUp size={13}/>{cluster.support_count} student upvotes</span>
+            <span className="flex items-center gap-1.5"><Users size={13}/>{cluster.departments_involved.length} branches affected</span>
           </div>
 
           <div className="flex flex-wrap gap-2 mb-4">
@@ -127,19 +128,19 @@ export default function IssueDetailPage() {
 
           {cluster.sla_deadline && (
             <div className={`text-xs flex items-center gap-1.5 ${slaOverdue ? 'text-[#FF4444]' : 'text-[#64748B]'}`}>
-              <Clock size={11} />SLA: {fmtDate(cluster.sla_deadline)}{slaOverdue && ' — OVERDUE'}
+              <Clock size={11} />Target Resolution Deadline: {fmtDate(cluster.sla_deadline)}{slaOverdue && ' — OVERDUE ⏳'}
             </div>
           )}
 
           {user?.role === 'student' && (
             <div className="mt-4 flex flex-wrap gap-2">
               <button onClick={() => supportMut.mutate()} disabled={supportMut.isPending}
-                className="btn-ghost flex items-center gap-1.5 text-sm">
-                <ThumbsUp size={13} /> Support this issue
+                className="btn-ghost flex items-center gap-1.5 text-sm hover:border-[#00D4FF]/40">
+                <ThumbsUp size={13} className="text-[#00D4FF]" /> Upvote / I Have This Issue Too
               </button>
               <button onClick={() => setShowContextModal(true)}
-                className="btn-ghost flex items-center gap-1.5 text-sm">
-                <FileText size={13} /> Add Context / Evidence
+                className="btn-ghost flex items-center gap-1.5 text-sm hover:border-white/40">
+                <FileText size={13} /> Add Proof & Details
               </button>
             </div>
           )}
@@ -147,7 +148,7 @@ export default function IssueDetailPage() {
 
         {explanation && (
           <div className="card p-5 mb-5">
-            <p className="section-label mb-4">Why this score?</p>
+            <p className="section-label mb-4">How this issue is verified & ranked</p>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {Object.entries(explanation.reason).map(([k, v]) => (
                 <div key={k} className="bg-[#1C2333] rounded-lg p-3">
@@ -158,7 +159,7 @@ export default function IssueDetailPage() {
             </div>
             {!explanation.diversity_valid && (
               <div className="mt-3 px-3 py-2 rounded-lg bg-[#FFB800]/5 border border-[#FFB800]/20 text-xs text-[#FFB800]">
-                Confidence is 0 — diversity requirements not met
+                💡 Tip: Issues need upvotes from students across at least 2 different branches to trend campus-wide and trigger administrative escalation.
               </div>
             )}
           </div>
@@ -166,7 +167,7 @@ export default function IssueDetailPage() {
 
         {timeline.length > 0 && (
           <div className="card p-5 mb-5">
-            <p className="section-label mb-4">Event timeline</p>
+            <p className="section-label mb-4">Issue activity & updates</p>
             <div className="space-y-3">
               {timeline.map((e: any, i: number) => (
                 <div key={i} className="flex items-start gap-3">
@@ -183,11 +184,15 @@ export default function IssueDetailPage() {
 
         {!feedbackSent && cluster.status === 'resolved' && user?.role === 'student' && (
           <div className="card p-5">
-            <p className="section-label mb-3">Was this resolved?</p>
+            <p className="section-label mb-3">Did the college fix this problem?</p>
             <div className="flex gap-3">
-              {['resolved', 'partial', 'unresolved'].map(s => (
-                <button key={s} onClick={() => feedbackMut.mutate(s)}
-                  className="btn-ghost text-sm capitalize flex-1">{s}</button>
+              {[
+                { key: 'resolved', label: 'Yes, Fixed! 🎉' },
+                { key: 'partial', label: 'Partially ⚠️' },
+                { key: 'unresolved', label: 'Still Unresolved ❌' },
+              ].map(({ key, label }) => (
+                <button key={key} onClick={() => feedbackMut.mutate(key)}
+                  className="btn-ghost text-sm flex-1 hover:border-[#00D4FF]/40">{label}</button>
               ))}
             </div>
           </div>

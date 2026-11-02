@@ -177,7 +177,7 @@ export function AdminTable({ clusters, onUpdate }: { clusters: Cluster[]; onUpda
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-white/[0.06]">
-              {['Issue cluster', 'Status', 'Confidence', 'Severity', 'SLA', 'Signals', 'Actions'].map(h => (
+              {['Campus Issue / Topic', 'Status', 'Impact Score', 'Urgency', 'Resolution Target', 'Student Backing', 'Actions'].map(h => (
                 <th key={h} className="text-left px-5 py-3 text-xs text-slate-500 font-medium whitespace-nowrap">
                   {h}
                 </th>
@@ -236,9 +236,9 @@ export function AdminTable({ clusters, onUpdate }: { clusters: Cluster[]; onUpda
                 <td className="px-5 py-4 whitespace-nowrap">
                   <div className="space-y-0.5 text-xs text-slate-400">
                     <div>{cluster.report_count} reports</div>
-                    <div>{cluster.support_count} supports</div>
+                    <div>{cluster.support_count} student upvotes</div>
                     <div className={cluster.diversity_valid ? 'text-signal-green' : 'text-signal-amber'}>
-                      {cluster.diversity_valid ? '✓ diversity valid' : '⚠ diversity pending'}
+                      {cluster.diversity_valid ? '✓ Cross-branch verified' : '⚠ Single branch only'}
                     </div>
                   </div>
                 </td>
