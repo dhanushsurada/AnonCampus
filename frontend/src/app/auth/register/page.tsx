@@ -9,9 +9,8 @@ import { Shield, AlertCircle, Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { authApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
-import { CATEGORIES } from '@/types'
+import { DEPARTMENTS } from '@/types'
 
-const DEPARTMENTS = ['CSE','ECE','EEE','MECH','CIVIL','IT','AIDS','AIML','CSD','MBA','MCA']
 const YEARS = [1, 2, 3, 4]
 
 const SECURITY_QUESTIONS = [

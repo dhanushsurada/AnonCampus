@@ -65,3 +65,9 @@ export const CATEGORIES = [
 ] as const
 
 export type Category = typeof CATEGORIES[number]
+
+export const DEPARTMENTS = [
+  'CSE', 'ECE', 'EEE', 'MECH', 'CIVIL', 'IT', 'AIDS', 'AIML', 'CSD', 'MBA', 'MCA',
+] as const
+
+export type Department = typeof DEPARTMENTS[number]

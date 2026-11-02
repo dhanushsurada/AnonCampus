@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { authApi } from '@/lib/api'
+import { DEPARTMENTS } from '@/types'
 
 // Email form schema
 const emailSchema = z.object({
@@ -280,7 +281,7 @@ export default function ForgotPasswordPage() {
                 <div>
                   <label className="text-xs text-[#94A3B8] block mb-1">Department</label>
                   <select {...credForm.register('department')} className="input text-xs">
-                    {['CSE', 'ECE', 'EEE', 'MECH', 'CIVIL', 'IT', 'AI&DS'].map((d) => (
+                    {DEPARTMENTS.map((d) => (
                       <option key={d} value={d}>{d}</option>
                     ))}
                   </select>
