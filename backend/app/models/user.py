@@ -68,6 +68,10 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     is_verified = Column(Boolean, default=False, nullable=False)
 
+    # Security recovery question & answer (hashed for privacy)
+    security_question = Column(String(255), nullable=True)
+    hashed_security_answer = Column(String(255), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

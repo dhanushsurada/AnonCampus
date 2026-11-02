@@ -80,3 +80,9 @@ async def init_db():
     async with engine.begin() as conn:
         from app.models import user, cluster, issue, report
         await conn.run_sync(Base.metadata.create_all)
+        try:
+            from sqlalchemy import text
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS security_question VARCHAR(255);"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS hashed_security_answer VARCHAR(255);"))
+        except Exception:
+            pass  # Non-PostgreSQL dialects or SQLite in-memory tests ignore this

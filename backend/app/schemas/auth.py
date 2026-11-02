@@ -18,6 +18,8 @@ class RegisterRequest(BaseModel):
     student_id: str = Field(..., min_length=3, max_length=50)
     department: str = Field(..., min_length=2, max_length=100)
     academic_year: int = Field(..., ge=1, le=4)
+    security_question: Optional[str] = None
+    security_answer: Optional[str] = None
 
     @field_validator("password")
     @classmethod
@@ -88,6 +90,7 @@ class StudentCredentialResetRequest(BaseModel):
     student_id: str
     department: str
     academic_year: int
+    security_answer: Optional[str] = None
     new_password: str = Field(..., min_length=8, max_length=128)
 
     @field_validator("new_password")

@@ -313,25 +313,45 @@ async def test_reset_password_by_student_credentials(client):
         "student_id": "CRED001",
         "department": "ECE",
         "academic_year": 2,
+        "security_question": "What was the name of your first school?",
+        "security_answer": "Oakridge",
     })
     assert reg.status_code == 201
 
+    # Check retrieve security question endpoint
+    sq_resp = await client.get("/api/auth/security-question?email=creduser@nsrit.edu.in&student_id=CRED001")
+    assert sq_resp.status_code == 200
+    assert sq_resp.json()["security_question"] == "What was the name of your first school?"
+
     # Attempt with incorrect roll number -> 400
-    bad_resp = await client.post("/api/auth/reset-password-student-credentials", json={
+    bad_id_resp = await client.post("/api/auth/reset-password-student-credentials", json={
         "email": "creduser@nsrit.edu.in",
         "student_id": "WRONG_ID",
         "department": "ECE",
         "academic_year": 2,
+        "security_answer": "Oakridge",
         "new_password": "NewSecretPass99",
     })
-    assert bad_resp.status_code == 400
+    assert bad_id_resp.status_code == 400
 
-    # Attempt with correct student credentials -> 200
+    # Attempt with incorrect security answer -> 400
+    bad_ans_resp = await client.post("/api/auth/reset-password-student-credentials", json={
+        "email": "creduser@nsrit.edu.in",
+        "student_id": "CRED001",
+        "department": "ECE",
+        "academic_year": 2,
+        "security_answer": "WrongSchool",
+        "new_password": "NewSecretPass99",
+    })
+    assert bad_ans_resp.status_code == 400
+
+    # Attempt with correct student credentials and security answer -> 200
     good_resp = await client.post("/api/auth/reset-password-student-credentials", json={
         "email": "creduser@nsrit.edu.in",
         "student_id": "CRED001",
         "department": "ECE",
         "academic_year": 2,
+        "security_answer": "oakridge",  # case-insensitive check
         "new_password": "NewSecretPass99",
     })
     assert good_resp.status_code == 200

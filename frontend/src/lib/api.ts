@@ -172,11 +172,15 @@ export const authApi = {
   changePassword: (data: { current_password: string; new_password: string }) =>
     api.post('/auth/change-password', data),
 
+  getSecurityQuestion: (email: string, student_id: string) =>
+    api.get('/auth/security-question', { params: { email, student_id } }),
+
   resetPasswordByStudentCredentials: (data: {
     email: string
     student_id: string
     department: string
     academic_year: number
+    security_answer?: string
     new_password: string
   }) => api.post('/auth/reset-password-student-credentials', data),
 }

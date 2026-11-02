@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   Shield, Mail, AlertCircle, ArrowLeft, CheckCircle2,
-  ExternalLink, UserCheck, KeyRound, Eye, EyeOff, Info
+  ExternalLink, UserCheck, KeyRound, Eye, EyeOff, Info, HelpCircle
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { authApi } from '@/lib/api'
@@ -24,6 +24,7 @@ const credentialSchema = z.object({
   student_id: z.string().min(3, 'Student ID / Roll Number required'),
   department: z.string().min(1, 'Department required'),
   academic_year: z.coerce.number().min(1).max(4),
+  security_answer: z.string().min(1, 'Security answer required'),
   new_password: z
     .string()
     .min(8, 'At least 8 characters')
@@ -44,6 +45,7 @@ export default function ForgotPasswordPage() {
   const [emailSentStatus, setEmailSentStatus] = useState<boolean>(false)
   const [devResetUrl, setDevResetUrl] = useState<string | null>(null)
   const [showPass, setShowPass] = useState(false)
+  const [securityQuestion, setSecurityQuestion] = useState<string | null>(null)
 
   // Email form
   const emailForm = useForm<EmailFormData>({
@@ -58,6 +60,23 @@ export default function ForgotPasswordPage() {
       academic_year: 3,
     },
   })
+
+  const watchEmail = credForm.watch('email')
+  const watchStudentId = credForm.watch('student_id')
+
+  useEffect(() => {
+    if (watchEmail?.includes('@') && watchStudentId?.length >= 3) {
+      authApi.getSecurityQuestion(watchEmail.trim(), watchStudentId.trim().toUpperCase())
+        .then((res) => {
+          if (res.data?.security_question) {
+            setSecurityQuestion(res.data.security_question)
+          }
+        })
+        .catch(() => {
+          setSecurityQuestion(null)
+        })
+    }
+  }, [watchEmail, watchStudentId])
 
   const onEmailSubmit = async (data: EmailFormData) => {
     setLoading(true)
@@ -84,6 +103,7 @@ export default function ForgotPasswordPage() {
         student_id: data.student_id,
         department: data.department,
         academic_year: data.academic_year,
+        security_answer: data.security_answer,
         new_password: data.new_password,
       })
       toast.success('Password reset successfully via student credentials!')
@@ -272,6 +292,33 @@ export default function ForgotPasswordPage() {
                       <option key={y} value={y}>Year {y}</option>
                     ))}
                   </select>
+                </div>
+              </div>
+
+              {/* Security Question & Secret Answer Verification */}
+              <div className="pt-1 pb-1 space-y-2 border-t border-white/[0.04]">
+                <div className="p-2.5 rounded-lg bg-[#00D4FF]/10 border border-[#00D4FF]/20">
+                  <span className="text-[10px] text-[#00D4FF] font-semibold uppercase tracking-wider block mb-0.5">
+                    Security Question
+                  </span>
+                  <span className="text-xs text-white font-medium">
+                    {securityQuestion || "What was the name of your first school?"}
+                  </span>
+                </div>
+
+                <div>
+                  <label className="text-xs text-[#94A3B8] block mb-1">
+                    Your Secret Answer
+                  </label>
+                  <input
+                    {...credForm.register('security_answer')}
+                    type="text"
+                    className="input text-xs"
+                    placeholder="Enter your registered answer…"
+                  />
+                  {credForm.formState.errors.security_answer && (
+                    <p className="text-[#FF4444] text-[11px] mt-1">{credForm.formState.errors.security_answer.message}</p>
+                  )}
                 </div>
               </div>
 

@@ -11,7 +11,7 @@ Auth routes — fully hardened
 """
 import uuid
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -106,6 +106,8 @@ async def register(
         department=payload.department,
         academic_year=payload.academic_year,
         is_verified=True,
+        security_question=payload.security_question.strip() if payload.security_question else None,
+        hashed_security_answer=hash_password(payload.security_answer.strip().lower()) if payload.security_answer else None,
     )
     db.add(user)
     await db.commit()
@@ -270,6 +272,35 @@ async def forgot_password(
     return response_data
 
 
+@router.get("/security-question")
+async def get_security_question(
+    email: str = Query(...),
+    student_id: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Retrieve registered security question for student credential recovery.
+    """
+    result = await db.execute(
+        select(User).where(
+            User.email == email.lower(),
+            User.student_id == student_id.strip().upper(),
+            User.is_active == True,
+        )
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Student account not found with provided email and ID",
+        )
+
+    return {
+        "security_question": user.security_question or "What was the name of your first school?",
+        "has_security_question": bool(user.hashed_security_answer),
+    }
+
+
 @router.post("/reset-password-student-credentials")
 async def reset_password_by_student_credentials(
     payload: StudentCredentialResetRequest,
@@ -278,7 +309,7 @@ async def reset_password_by_student_credentials(
     """
     Alternative password recovery for students when college domain email
     delivery is blocked, delayed, or unreachable.
-    Validates email + student_id + department + academic_year match.
+    Validates email + student_id + department + academic_year + security_answer.
     """
     result = await db.execute(
         select(User).where(
@@ -295,6 +326,19 @@ async def reset_password_by_student_credentials(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Student credentials do not match our records",
         )
+
+    # If the user registered a security answer, enforce it
+    if user.hashed_security_answer:
+        if not payload.security_answer:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Security answer is required for this account",
+            )
+        if not verify_password(payload.security_answer.strip().lower(), user.hashed_security_answer):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Incorrect answer to the security question",
+            )
 
     user.hashed_password = hash_password(payload.new_password)
     await revoke_all_user_tokens(db, user.id, reason="student_credential_reset")
