@@ -4,11 +4,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Shield, LogOut, AlertTriangle, Clock, BarChart3,
   RefreshCw, CheckCircle, TrendingUp, Users, Zap, FileText,
+  History, ArrowRight, User as UserIcon
 } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 import { useRequireAuth, useAutoRefresh } from '@/hooks/useAuth'
 import { adminApi } from '@/lib/api'
 import { AdminTable } from '@/components/admin/AdminTable'
+import { ProfileModal } from '@/components/dashboard/ProfileModal'
+import { StatusBadge } from '@/components/ui/StatusBadge'
+import { fmtDate } from '@/lib/utils'
 import { Cluster, AdminStats } from '@/types'
 import Link from 'next/link'
 
@@ -41,11 +45,13 @@ export default function AdminDashboardPage() {
   const { logout } = useAuthStore()
   const qc = useQueryClient()
 
+  const [activeTab, setActiveTab] = useState<'clusters' | 'audit'>('clusters')
   const [statusFilter, setStatusFilter] = useState('')
   const [sortBy, setSortBy] = useState('confidence')
   const [escalatedOnly, setEscalatedOnly] = useState(false)
   const [severityMin, setSeverityMin] = useState(0)
   const [page, setPage] = useState(1)
+  const [showProfileModal, setShowProfileModal] = useState(false)
 
   const { data: stats } = useQuery<AdminStats>({
     queryKey: ['admin-stats'],
@@ -54,15 +60,22 @@ export default function AdminDashboardPage() {
     refetchInterval: 30_000,
   })
 
-  const { data: clustersData, isLoading } = useQuery({
+  const { data: clustersData, isLoading: clustersLoading } = useQuery({
     queryKey: ['admin-clusters', statusFilter, escalatedOnly, page],
     queryFn: () => adminApi.listClusters({
       page, page_size: 20,
       status_filter: statusFilter || undefined,
       escalated_only: escalatedOnly,
     }).then(r => r.data),
-    enabled: !!user,
+    enabled: !!user && activeTab === 'clusters',
     refetchInterval: 15_000,
+  })
+
+  const { data: auditData, isLoading: auditLoading } = useQuery({
+    queryKey: ['admin-audit', page],
+    queryFn: () => adminApi.auditLog({ page, page_size: 20 }).then(r => r.data),
+    enabled: !!user && activeTab === 'audit',
+    refetchInterval: 20_000,
   })
 
   const clusters: Cluster[] = (clustersData?.items ?? [])
@@ -103,8 +116,15 @@ export default function AdminDashboardPage() {
               Student view
             </Link>
             <span className="text-[#475569]">·</span>
-            <span className="text-xs text-[#64748B] hidden sm:block">{user?.email}</span>
-            <button onClick={logout} className="text-[#64748B] hover:text-[#FF4444] transition-colors">
+            <button
+              onClick={() => setShowProfileModal(true)}
+              className="text-xs text-[#64748B] hover:text-[#00D4FF] flex items-center gap-1 transition-colors"
+              title="Profile & Password Settings"
+            >
+              <UserIcon size={14} />
+              <span className="hidden sm:inline">{user?.email}</span>
+            </button>
+            <button onClick={logout} className="text-[#64748B] hover:text-[#FF4444] transition-colors" title="Logout">
               <LogOut size={15} />
             </button>
           </div>
@@ -112,13 +132,42 @@ export default function AdminDashboardPage() {
       </nav>
 
       <div className="relative z-10 max-w-7xl mx-auto px-6 py-8">
-
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold">Grievance Intelligence Dashboard</h1>
-          <p className="text-[#64748B] text-sm mt-1">
-            NSRIT · Real-time signal processing · {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Grievance Intelligence Dashboard</h1>
+            <p className="text-[#64748B] text-sm mt-1">
+              Institution Governance & Automated Signal Triaging
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setActiveTab('clusters')
+                setPage(1)
+              }}
+              className={`px-4 py-2 rounded-lg text-xs font-medium transition-all ${
+                activeTab === 'clusters'
+                  ? 'bg-[#00D4FF]/15 text-[#00D4FF] border border-[#00D4FF]/30'
+                  : 'text-[#64748B] hover:text-white border border-transparent'
+              }`}
+            >
+              Clusters & Grievances
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('audit')
+                setPage(1)
+              }}
+              className={`px-4 py-2 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                activeTab === 'audit'
+                  ? 'bg-[#00D4FF]/15 text-[#00D4FF] border border-[#00D4FF]/30'
+                  : 'text-[#64748B] hover:text-white border border-transparent'
+              }`}
+            >
+              <History size={13} /> Audit Trail
+            </button>
+          </div>
         </div>
 
         {/* Metrics */}
@@ -128,86 +177,180 @@ export default function AdminDashboardPage() {
           <MetricCard label="Escalated" value={stats?.escalated} color="#FFB800" icon={AlertTriangle} sub="Needs action" />
           <MetricCard label="Resolved" value={stats?.resolved} color="#B44FFF" icon={CheckCircle} sub="Closed" />
           <MetricCard label="SLA Breached" value={stats?.overdue_sla} color="#FF4444" icon={Clock} sub={`${slaBreachPct}% of total`} />
-          <MetricCard label="Issues" value={clustersData?.total} color="#64748B" icon={FileText} sub="Across clusters" />
+          <MetricCard label="Issues" value={clustersData?.total ?? 0} color="#64748B" icon={FileText} sub="Tracked signals" />
         </div>
 
-        {/* Filters */}
-        <div className="card p-4 mb-6">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-xs font-mono text-[#64748B] uppercase tracking-widest">Filters</span>
+        {activeTab === 'clusters' ? (
+          <>
+            {/* Filters */}
+            <div className="card p-4 mb-6">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-xs font-mono text-[#64748B] uppercase tracking-widest">Filters</span>
 
-            <button
-              onClick={() => setEscalatedOnly(!escalatedOnly)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                escalatedOnly
-                  ? 'bg-[#FFB800]/10 text-[#FFB800] border-[#FFB800]/30'
-                  : 'text-[#64748B] border-white/10 hover:border-white/20'
-              }`}
-            >
-              <AlertTriangle size={10} className="inline mr-1" />
-              Escalated only
-            </button>
+                <button
+                  onClick={() => setEscalatedOnly(!escalatedOnly)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                    escalatedOnly
+                      ? 'bg-[#FFB800]/10 text-[#FFB800] border-[#FFB800]/30'
+                      : 'text-[#64748B] border-white/10 hover:border-white/20'
+                  }`}
+                >
+                  <AlertTriangle size={10} className="inline mr-1" />
+                  Escalated only
+                </button>
 
-            <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1) }}
-              className="input py-1.5 text-xs w-36">
-              {STATUS_OPTIONS.map(s => (
-                <option key={s} value={s}>{s ? s.charAt(0).toUpperCase() + s.slice(1) : 'All statuses'}</option>
-              ))}
-            </select>
+                <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1) }}
+                  className="input py-1.5 text-xs w-36">
+                  {STATUS_OPTIONS.map(s => (
+                    <option key={s} value={s}>{s ? s.charAt(0).toUpperCase() + s.slice(1) : 'All statuses'}</option>
+                  ))}
+                </select>
 
-            <select value={severityMin} onChange={e => setSeverityMin(Number(e.target.value))}
-              className="input py-1.5 text-xs w-40">
-              <option value={0}>Any severity</option>
-              <option value={0.5}>≥ 0.5 Medium</option>
-              <option value={0.7}>≥ 0.7 High</option>
-              <option value={0.85}>≥ 0.85 Critical</option>
-            </select>
+                <select value={severityMin} onChange={e => setSeverityMin(Number(e.target.value))}
+                  className="input py-1.5 text-xs w-40">
+                  <option value={0}>Any severity</option>
+                  <option value={0.5}>≥ 0.5 Medium</option>
+                  <option value={0.7}>≥ 0.7 High</option>
+                  <option value={0.85}>≥ 0.85 Critical</option>
+                </select>
 
-            <select value={sortBy} onChange={e => setSortBy(e.target.value)}
-              className="input py-1.5 text-xs w-44">
-              {SORT_OPTIONS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-            </select>
+                <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+                  className="input py-1.5 text-xs w-44">
+                  {SORT_OPTIONS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </select>
 
-            <button onClick={() => qc.invalidateQueries({ queryKey: ['admin-clusters', 'admin-stats'] })}
-              className="ml-auto text-[#64748B] hover:text-white transition-colors">
-              <RefreshCw size={14} />
-            </button>
-          </div>
-        </div>
+                <button onClick={() => qc.invalidateQueries({ queryKey: ['admin-clusters', 'admin-stats'] })}
+                  className="ml-auto text-[#64748B] hover:text-white transition-colors"
+                  title="Refresh data">
+                  <RefreshCw size={14} />
+                </button>
+              </div>
+            </div>
 
-        {/* Table */}
-        {isLoading ? (
-          <div className="card p-8 text-center text-[#64748B]">
-            <RefreshCw size={20} className="mx-auto mb-2 animate-spin" />
-            Loading clusters…
-          </div>
-        ) : clusters.length === 0 ? (
-          <div className="card p-12 text-center">
-            <CheckCircle size={28} className="mx-auto mb-3 text-[#00FF88] opacity-50" />
-            <p className="font-medium text-[#94A3B8]">No clusters match current filters</p>
-            <button onClick={() => { setStatusFilter(''); setEscalatedOnly(false); setSeverityMin(0) }}
-              className="mt-3 text-xs text-[#00D4FF] hover:underline">Clear filters</button>
-          </div>
+            {/* Table */}
+            {clustersLoading ? (
+              <div className="card p-8 text-center text-[#64748B]">
+                <RefreshCw size={20} className="mx-auto mb-2 animate-spin" />
+                Loading clusters…
+              </div>
+            ) : clusters.length === 0 ? (
+              <div className="card p-12 text-center">
+                <CheckCircle size={28} className="mx-auto mb-3 text-[#00FF88] opacity-50" />
+                <p className="font-medium text-[#94A3B8]">No clusters match current filters</p>
+                <button onClick={() => { setStatusFilter(''); setEscalatedOnly(false); setSeverityMin(0) }}
+                  className="mt-3 text-xs text-[#00D4FF] hover:underline">Clear filters</button>
+              </div>
+            ) : (
+              <AdminTable
+                clusters={clusters}
+                onUpdate={() => qc.invalidateQueries({ queryKey: ['admin-clusters', 'admin-stats'] })}
+              />
+            )}
+
+            {/* Pagination */}
+            {clustersData && clustersData.total > 20 && (
+              <div className="flex items-center justify-between mt-4 text-sm text-[#64748B]">
+                <span>Page {page} · {clustersData.total} total</span>
+                <div className="flex gap-2">
+                  <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                    className="btn-ghost py-1.5 px-3 text-xs disabled:opacity-30">Previous</button>
+                  <button onClick={() => setPage(p => p + 1)} disabled={!clustersData.has_next}
+                    className="btn-ghost py-1.5 px-3 text-xs disabled:opacity-30">Next</button>
+                </div>
+              </div>
+            )}
+          </>
         ) : (
-          <AdminTable
-            clusters={clusters}
-            onUpdate={() => qc.invalidateQueries({ queryKey: ['admin-clusters', 'admin-stats'] })}
-          />
-        )}
+          /* Audit Trail View */
+          <div className="space-y-4">
+            <div className="card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-base font-semibold text-white">Administrative Audit Trail</h3>
+                  <p className="text-xs text-[#64748B] mt-0.5">
+                    Immutable log of state changes, SLA adjustments, and administrator actions
+                  </p>
+                </div>
+                <button
+                  onClick={() => qc.invalidateQueries({ queryKey: ['admin-audit'] })}
+                  className="text-[#64748B] hover:text-white transition-colors"
+                >
+                  <RefreshCw size={14} />
+                </button>
+              </div>
 
-        {/* Pagination */}
-        {clustersData && clustersData.total > 20 && (
-          <div className="flex items-center justify-between mt-4 text-sm text-[#64748B]">
-            <span>Page {page} · {clustersData.total} total</span>
-            <div className="flex gap-2">
-              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                className="btn-ghost py-1.5 px-3 text-xs disabled:opacity-30">Previous</button>
-              <button onClick={() => setPage(p => p + 1)} disabled={!clustersData.has_next}
-                className="btn-ghost py-1.5 px-3 text-xs disabled:opacity-30">Next</button>
+              {auditLoading ? (
+                <div className="p-8 text-center text-[#64748B]">Loading audit logs…</div>
+              ) : !auditData?.items?.length ? (
+                <div className="p-12 text-center text-[#64748B]">
+                  <History size={28} className="mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No administrative actions recorded yet.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-white/[0.06] text-[#64748B] text-left">
+                        <th className="py-2.5 px-3 font-medium">Timestamp</th>
+                        <th className="py-2.5 px-3 font-medium">Action Type</th>
+                        <th className="py-2.5 px-3 font-medium">Cluster</th>
+                        <th className="py-2.5 px-3 font-medium">Status Change</th>
+                        <th className="py-2.5 px-3 font-medium">Reason / Remarks</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/[0.03]">
+                      {auditData.items.map((entry: any) => (
+                        <tr key={entry.id} className="hover:bg-white/[0.02]">
+                          <td className="py-3 px-3 text-[#94A3B8] font-mono whitespace-nowrap">
+                            {fmtDate(entry.created_at)}
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="font-mono px-2 py-0.5 rounded bg-[#1C2333] text-[#00D4FF]">
+                              {entry.action_type}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3">
+                            <Link
+                              href={`/issues/${entry.cluster_id}`}
+                              className="text-[#00D4FF] hover:underline flex items-center gap-1 font-mono"
+                            >
+                              Cluster #{entry.cluster_id} <ArrowRight size={10} />
+                            </Link>
+                          </td>
+                          <td className="py-3 px-3 whitespace-nowrap">
+                            <span className="text-[#64748B]">{entry.old_status || 'initial'}</span>
+                            <span className="text-white mx-1.5">→</span>
+                            <span className="text-[#00FF88] font-medium">{entry.new_status}</span>
+                          </td>
+                          <td className="py-3 px-3 text-[#94A3B8] max-w-xs truncate">
+                            {entry.reason || '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {auditData && auditData.total > 20 && (
+                <div className="flex items-center justify-between mt-4 text-xs text-[#64748B]">
+                  <span>Page {page} · {auditData.total} total audit records</span>
+                  <div className="flex gap-2">
+                    <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                      className="btn-ghost py-1.5 px-3 disabled:opacity-30">Previous</button>
+                    <button onClick={() => setPage(p => p + 1)} disabled={!auditData.has_next}
+                      className="btn-ghost py-1.5 px-3 disabled:opacity-30">Next</button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
       </div>
+
+      {showProfileModal && (
+        <ProfileModal onClose={() => setShowProfileModal(false)} />
+      )}
     </div>
   )
 }

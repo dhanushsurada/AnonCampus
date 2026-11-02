@@ -5,13 +5,14 @@ Idempotency-Key header supported on POST /issues
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, desc, func
+from sqlalchemy import select, and_, or_, desc, func
 from typing import Optional
 
 from app.db.session import get_db
 from app.models.user import User
 from app.models.issue import Issue
 from app.models.cluster import Cluster
+from app.models.report import Report
 from app.schemas.issue import (
     IssueCreate, IssueResponse, IssueDetailResponse,
     FeedbackCreate, ContextAddRequest, PaginatedResponse,
@@ -46,6 +47,8 @@ async def list_clusters(
     page_size: int = Query(20, ge=1, le=100),
     status_filter: Optional[str] = Query(None),
     feed_type: Optional[str] = Query(None, description="new|active|trending"),
+    category: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -63,6 +66,18 @@ async def list_clusters(
     elif feed_type == "trending":
         conditions.append(Cluster.visibility_score >= 0.5)
 
+    if category:
+        conditions.append(Cluster.category == category.lower())
+
+    if search:
+        search_term = f"%{search.strip()}%"
+        conditions.append(
+            or_(
+                Cluster.title.ilike(search_term),
+                Cluster.summary.ilike(search_term),
+            )
+        )
+
     base = select(Cluster).where(and_(*conditions))
     total = (await db.execute(select(func.count()).select_from(base.subquery()))).scalar()
     result = await db.execute(
@@ -72,6 +87,42 @@ async def list_clusters(
     items = result.scalars().all()
     return PaginatedResponse(
         items=[ClusterResponse.model_validate(c) for c in items],
+        total=total, page=page, page_size=page_size,
+        has_next=(page * page_size) < total,
+    )
+
+
+@router.get("/me", response_model=PaginatedResponse)
+async def list_my_issues(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns issues submitted by the current authenticated student.
+    Anonymity is maintained externally — only the submitter can view their own submission history.
+    """
+    subquery = (
+        select(Report.issue_id)
+        .where(
+            Report.reporter_id == current_user.id,
+            Report.institution_id == current_user.institution_id,
+            Report.signal_type == "report",
+        )
+    )
+    base = select(Issue).where(
+        Issue.institution_id == current_user.institution_id,
+        Issue.id.in_(subquery),
+    )
+    total = (await db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
+    result = await db.execute(
+        base.order_by(desc(Issue.created_at))
+            .offset((page - 1) * page_size).limit(page_size)
+    )
+    items = result.scalars().all()
+    return PaginatedResponse(
+        items=[IssueResponse.model_validate(i) for i in items],
         total=total, page=page, page_size=page_size,
         has_next=(page * page_size) < total,
     )

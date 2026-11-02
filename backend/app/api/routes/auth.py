@@ -17,14 +17,19 @@ from sqlalchemy import select
 
 from app.db.session import get_db
 from app.models.user import User, Institution
-from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, UserResponse
+from app.schemas.auth import (
+    RegisterRequest, LoginRequest, TokenResponse, UserResponse,
+    ForgotPasswordRequest, ResetPasswordRequest, ChangePasswordRequest,
+)
 from app.core.security import (
     hash_password, verify_password,
     create_access_token, create_refresh_token, decode_token,
     store_refresh_token, revoke_refresh_token, revoke_all_user_tokens,
     check_login_lockout, record_login_failure, clear_login_failures,
     get_current_user,
+    create_password_reset_token, verify_password_reset_token,
 )
+from app.core.config import settings
 from app.middleware.rate_limit import check_register_limit
 
 logger = logging.getLogger("anoncampus.auth")
@@ -224,3 +229,88 @@ async def logout_all(
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@router.post("/forgot-password")
+async def forgot_password(
+    payload: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Generate password reset token.
+    Generic response to prevent user enumeration.
+    In development/non-production, returns reset_token & reset_url directly for testing.
+    """
+    result = await db.execute(select(User).where(User.email == payload.email.lower()))
+    user = result.scalar_one_or_none()
+
+    response_data = {
+        "message": "If this email is registered, a password reset link has been sent.",
+    }
+
+    if user and user.is_active:
+        token = create_password_reset_token(user.email)
+        if settings.ENVIRONMENT != "production":
+            response_data["reset_token"] = token
+            response_data["reset_url"] = f"/auth/reset-password?token={token}"
+            logger.info(f"Password reset token generated for {user.email}: {token}")
+        else:
+            logger.info(f"Password reset triggered for {user.email}")
+
+    return response_data
+
+
+@router.post("/reset-password")
+async def reset_password(
+    payload: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Reset user password using a valid reset token.
+    Revokes all previous refresh tokens/sessions.
+    """
+    email = verify_password_reset_token(payload.token)
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token",
+        )
+
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User not found or account disabled",
+        )
+
+    user.hashed_password = hash_password(payload.new_password)
+    await revoke_all_user_tokens(db, user.id, reason="password_reset")
+    await db.commit()
+
+    logger.info(f"Password successfully reset for user id={user.id}")
+    return {"message": "Password reset successfully. You can now sign in with your new password."}
+
+
+@router.post("/change-password")
+async def change_password(
+    payload: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Change password for an authenticated user.
+    Validates current password and updates to new password.
+    """
+    if not verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        )
+
+    current_user.hashed_password = hash_password(payload.new_password)
+    await revoke_all_user_tokens(db, current_user.id, reason="change_password")
+    await db.commit()
+
+    logger.info(f"Password changed for user id={current_user.id}")
+    return {"message": "Password updated successfully"}

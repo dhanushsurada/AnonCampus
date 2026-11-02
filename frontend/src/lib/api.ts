@@ -162,11 +162,21 @@ export const authApi = {
 
   refresh: (refresh_token: string) =>
     api.post('/auth/refresh', { refresh_token }),
+
+  forgotPassword: (email: string) =>
+    api.post('/auth/forgot-password', { email }),
+
+  resetPassword: (data: { token: string; new_password: string }) =>
+    api.post('/auth/reset-password', data),
+
+  changePassword: (data: { current_password: string; new_password: string }) =>
+    api.post('/auth/change-password', data),
 }
 
 export const issuesApi = {
   list: (params?: any) => api.get('/issues', { params }),
   listClusters: (params?: any) => api.get('/issues/clusters', { params }),
+  myIssues: (params?: any) => api.get('/issues/me', { params }),
   get: (id: number) => api.get(`/issues/${id}`),
   create: (data: any) => api.post('/issues', data),
   support: (id: number) => api.post(`/issues/${id}/support`),

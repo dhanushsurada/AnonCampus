@@ -262,6 +262,105 @@ async def test_unauthenticated_rejected(client):
     assert resp.status_code in (401, 403)
 
 
+@pytest.mark.anyio
+async def test_forgot_and_reset_password(client):
+    # Register a user first
+    reg = await client.post("/api/auth/register", json={
+        "email": "resetuser@nsrit.edu.in",
+        "password": "OldPassword1",
+        "student_id": "RESET001",
+        "department": "CSE",
+        "academic_year": 3,
+    })
+    assert reg.status_code == 201
+
+    # Request reset token
+    forgot_resp = await client.post("/api/auth/forgot-password", json={
+        "email": "resetuser@nsrit.edu.in",
+    })
+    assert forgot_resp.status_code == 200
+    forgot_data = forgot_resp.json()
+    assert "reset_token" in forgot_data
+    token = forgot_data["reset_token"]
+
+    # Reset password
+    reset_resp = await client.post("/api/auth/reset-password", json={
+        "token": token,
+        "new_password": "NewSecretPassword1",
+    })
+    assert reset_resp.status_code == 200
+
+    # Old password should now fail
+    old_login = await client.post("/api/auth/login", json={
+        "email": "resetuser@nsrit.edu.in",
+        "password": "OldPassword1",
+    })
+    assert old_login.status_code == 401
+
+    # New password should succeed
+    new_login = await client.post("/api/auth/login", json={
+        "email": "resetuser@nsrit.edu.in",
+        "password": "NewSecretPassword1",
+    })
+    assert new_login.status_code == 200
+
+
+@pytest.mark.anyio
+async def test_change_password(client, student_token):
+    # Authenticated change password
+    change_resp = await client.post("/api/auth/change-password",
+        headers={"Authorization": f"Bearer {student_token}"},
+        json={
+            "current_password": "Test1234",
+            "new_password": "BrandNewPassword1",
+        }
+    )
+    assert change_resp.status_code == 200
+
+    # Verify login with new password
+    login_resp = await client.post("/api/auth/login", json={
+        "email": "student1@nsrit.edu.in",
+        "password": "BrandNewPassword1",
+    })
+    assert login_resp.status_code == 200
+
+
+@pytest.mark.anyio
+async def test_my_issues_and_filters(client, student_token):
+    # Submit issue
+    submit_resp = await client.post("/api/issues",
+        headers={"Authorization": f"Bearer {student_token}"},
+        json={
+            "title": "Water cooler in block B is broken and leaking",
+            "body": "The water cooler in block B second floor has been leaking water on the floor for 2 days. This is a slip hazard.",
+            "category": "infrastructure",
+        }
+    )
+    assert submit_resp.status_code == 201
+    issue_id = submit_resp.json()["id"]
+
+    # Query /issues/me
+    my_resp = await client.get("/api/issues/me",
+        headers={"Authorization": f"Bearer {student_token}"}
+    )
+    assert my_resp.status_code == 200
+    my_data = my_resp.json()
+    assert my_data["total"] >= 1
+    ids = [i["id"] for i in my_data["items"]]
+    assert issue_id in ids
+
+    # Test cluster search & category filter
+    cat_resp = await client.get("/api/issues/clusters?category=infrastructure",
+        headers={"Authorization": f"Bearer {student_token}"}
+    )
+    assert cat_resp.status_code == 200
+
+    search_resp = await client.get("/api/issues/clusters?search=Water",
+        headers={"Authorization": f"Bearer {student_token}"}
+    )
+    assert search_resp.status_code == 200
+
+
 # ── Health probes ──────────────────────────────────────────────────────────────
 
 @pytest.mark.anyio

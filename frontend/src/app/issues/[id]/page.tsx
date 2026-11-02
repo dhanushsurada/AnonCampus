@@ -7,16 +7,18 @@ import { useRequireAuth } from '@/hooks/useAuth'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { ScoreBar } from '@/components/ui/ScoreBar'
 import { fmtDate, severityColor, confidenceColor } from '@/lib/utils'
-import { AlertTriangle, Clock, Users, MessageSquare, ThumbsUp, ArrowLeft, CheckCircle } from 'lucide-react'
+import { AlertTriangle, Clock, Users, MessageSquare, ThumbsUp, ArrowLeft, CheckCircle, FileText } from 'lucide-react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { useState } from 'react'
+import { AddContextModal } from '@/components/dashboard/AddContextModal'
 
 export default function IssueDetailPage() {
   const { id } = useParams()
   const { user } = useRequireAuth()
   const qc = useQueryClient()
   const [feedbackSent, setFeedbackSent] = useState(false)
+  const [showContextModal, setShowContextModal] = useState(false)
 
   const { data: clusterData, isLoading, isError } = useQuery({
     queryKey: ['issue-cluster', id],
@@ -130,10 +132,14 @@ export default function IssueDetailPage() {
           )}
 
           {user?.role === 'student' && (
-            <div className="mt-4">
+            <div className="mt-4 flex flex-wrap gap-2">
               <button onClick={() => supportMut.mutate()} disabled={supportMut.isPending}
                 className="btn-ghost flex items-center gap-1.5 text-sm">
                 <ThumbsUp size={13} /> Support this issue
+              </button>
+              <button onClick={() => setShowContextModal(true)}
+                className="btn-ghost flex items-center gap-1.5 text-sm">
+                <FileText size={13} /> Add Context / Evidence
               </button>
             </div>
           )}
@@ -191,6 +197,14 @@ export default function IssueDetailPage() {
           <div className="card p-4 flex items-center gap-2 text-[#00FF88] text-sm">
             <CheckCircle size={14} /> Feedback recorded. Thank you.
           </div>
+        )}
+
+        {showContextModal && (
+          <AddContextModal
+            issueId={Number(id)}
+            onClose={() => setShowContextModal(false)}
+            onSuccess={() => qc.invalidateQueries({ queryKey: ['issue-cluster', id] })}
+          />
         )}
       </div>
     </div>

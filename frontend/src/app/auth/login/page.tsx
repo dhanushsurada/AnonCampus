@@ -75,7 +75,12 @@ export default function LoginPage() {
               )}
             </div>
             <div>
-              <label className="text-xs text-[#94A3B8] block mb-1.5">Password</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs text-[#94A3B8]">Password</label>
+                <Link href="/auth/forgot-password" className="text-xs text-[#00D4FF] hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
               <div className="relative">
                 <input {...register('password')} type={showPass ? 'text' : 'password'} className="input pr-10" placeholder="••••••••" />
                 <button type="button" onClick={() => setShowPass(!showPass)}
