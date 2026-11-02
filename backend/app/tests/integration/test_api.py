@@ -385,6 +385,26 @@ async def test_change_password(client, student_token):
 
 
 @pytest.mark.anyio
+async def test_update_profile(client, student_token):
+    # Authenticated update profile
+    patch_resp = await client.patch("/api/auth/profile",
+        headers={"Authorization": f"Bearer {student_token}"},
+        json={
+            "department": "CSD",
+            "academic_year": 3,
+            "email": "hacked@gmail.com",       # Attempt to change locked email
+            "student_id": "HACKED999",          # Attempt to change locked roll number
+        }
+    )
+    assert patch_resp.status_code == 200
+    data = patch_resp.json()
+    assert data["department"] == "CSD"
+    assert data["academic_year"] == 3
+    assert data["email"] == "student1@nsrit.edu.in"  # Email is locked and unchanged!
+    assert "student_id" not in data                  # Roll number remains unexposed
+
+
+@pytest.mark.anyio
 async def test_my_issues_and_filters(client, student_token):
     # Submit issue
     submit_resp = await client.post("/api/issues",

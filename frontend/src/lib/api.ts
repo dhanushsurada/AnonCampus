@@ -144,6 +144,13 @@ export const authApi = {
 
   me: () => api.get('/auth/me'),
 
+  updateProfile: (data: {
+    department?: string
+    academic_year?: number
+    security_question?: string
+    security_answer?: string
+  }) => api.patch('/auth/profile', data),
+
   logout: async (refresh_token?: string) => {
     try {
       const token = refresh_token || (typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null)

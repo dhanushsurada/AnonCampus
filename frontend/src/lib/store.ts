@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 
 export interface AuthUser {
   id: number
+  anon_id?: string
   email: string
   role: 'student' | 'admin' | 'super_admin'
   department?: string

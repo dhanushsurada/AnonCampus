@@ -20,7 +20,7 @@ from app.models.user import User, Institution
 from app.schemas.auth import (
     RegisterRequest, LoginRequest, TokenResponse, UserResponse,
     ForgotPasswordRequest, ResetPasswordRequest, ChangePasswordRequest,
-    StudentCredentialResetRequest,
+    StudentCredentialResetRequest, UpdateProfileRequest,
 )
 from app.core.security import (
     hash_password, verify_password,
@@ -232,6 +232,39 @@ async def logout_all(
 
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
+    return current_user
+
+
+@router.patch("/profile", response_model=UserResponse)
+async def update_profile(
+    payload: UpdateProfileRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Update mutable student profile fields (Department, Academic Year, Security Question/Answer).
+    LOCKED IMMUTABLE FIELDS:
+      - Email (institution bound)
+      - Student ID / Roll Number (institution unique identifier)
+      - Role (privilege bound)
+      - Anon ID (public cryptographic identifier)
+    """
+    if payload.department is not None:
+        current_user.department = payload.department
+
+    if payload.academic_year is not None:
+        current_user.academic_year = payload.academic_year
+
+    if payload.security_question is not None:
+        current_user.security_question = payload.security_question.strip()
+
+    if payload.security_answer is not None and payload.security_answer.strip():
+        current_user.hashed_security_answer = hash_password(payload.security_answer.strip().lower())
+
+    await db.commit()
+    await db.refresh(current_user)
+
+    logger.info(f"User {current_user.id} updated profile: dept={current_user.department}, year={current_user.academic_year}")
     return current_user
 
 

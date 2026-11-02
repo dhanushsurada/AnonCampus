@@ -103,6 +103,18 @@ class StudentCredentialResetRequest(BaseModel):
         return v
 
 
+class UpdateProfileRequest(BaseModel):
+    department: Optional[str] = Field(None, min_length=2, max_length=100)
+    academic_year: Optional[int] = Field(None, ge=1, le=4)
+    security_question: Optional[str] = Field(None, min_length=3, max_length=255)
+    security_answer: Optional[str] = Field(None, min_length=2, max_length=255)
+
+    @field_validator("department")
+    @classmethod
+    def department_clean(cls, v: Optional[str]) -> Optional[str]:
+        return v.strip() if v else None
+
+
 # ── Token ─────────────────────────────────────────────────────────────────────
 
 class TokenResponse(BaseModel):
