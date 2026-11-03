@@ -440,6 +440,78 @@ async def test_my_issues_and_filters(client, student_token):
     assert search_resp.status_code == 200
 
 
+@pytest.mark.anyio
+async def test_cluster_comments_and_discussion(client, student_token, student2_token):
+    # Submit issue to create a cluster
+    issue_resp = await client.post("/api/issues",
+        headers={"Authorization": f"Bearer {student_token}"},
+        json={
+            "title": "Library air conditioner not functioning in summer",
+            "body": "The reading hall AC in main central library has stopped cooling. It is unbearable to study.",
+            "category": "infrastructure",
+        }
+    )
+    assert issue_resp.status_code == 201
+    issue_id = issue_resp.json()["id"]
+
+    # Get the cluster
+    cl_resp = await client.get(f"/api/issues/{issue_id}/cluster",
+        headers={"Authorization": f"Bearer {student_token}"}
+    )
+    assert cl_resp.status_code == 200
+    cluster_id = cl_resp.json()["cluster"]["id"]
+
+    # Add a public anonymous comment
+    comm_resp = await client.post(f"/api/issues/clusters/{cluster_id}/comments",
+        headers={"Authorization": f"Bearer {student2_token}"},
+        json={"content": "I agree! 3rd floor reading room is especially humid and hot today."}
+    )
+    assert comm_resp.status_code == 201
+    comment_data = comm_resp.json()
+    assert comment_data["content"] == "I agree! 3rd floor reading room is especially humid and hot today."
+    assert "author_role" in comment_data
+
+    # List comments
+    list_resp = await client.get(f"/api/issues/clusters/{cluster_id}/comments",
+        headers={"Authorization": f"Bearer {student_token}"}
+    )
+    assert list_resp.status_code == 200
+    comments = list_resp.json()
+    assert len(comments) >= 1
+    assert any(c["id"] == comment_data["id"] for c in comments)
+
+
+@pytest.mark.anyio
+async def test_retract_support(client, student_token, student2_token):
+    issue_resp = await client.post("/api/issues",
+        headers={"Authorization": f"Bearer {student_token}"},
+        json={
+            "title": "Sports ground lights are broken during evening hours",
+            "body": "The floodlights near the volleyball court are flickering and completely shut off by 7 PM.",
+            "category": "sports",
+        }
+    )
+    issue_id = issue_resp.json()["id"]
+
+    # Student 2 supports
+    sup_resp = await client.post(f"/api/issues/{issue_id}/support",
+        headers={"Authorization": f"Bearer {student2_token}"}
+    )
+    assert sup_resp.status_code == 200
+
+    # Retract support
+    del_resp = await client.delete(f"/api/issues/{issue_id}/support",
+        headers={"Authorization": f"Bearer {student2_token}"}
+    )
+    assert del_resp.status_code == 200
+
+    # Student 2 can now support again
+    sup_resp2 = await client.post(f"/api/issues/{issue_id}/support",
+        headers={"Authorization": f"Bearer {student2_token}"}
+    )
+    assert sup_resp2.status_code == 200
+
+
 # ── Health probes ──────────────────────────────────────────────────────────────
 
 @pytest.mark.anyio

@@ -203,6 +203,12 @@ export function AdminTable({ clusters, onUpdate }: { clusters: Cluster[]; onUpda
                         {cluster.escalation_type === 'override' && (
                           <span className="text-xs text-signal-red font-mono">OVERRIDE</span>
                         )}
+                        <Link
+                          href={`/issues/${cluster.id}`}
+                          className="text-[11px] text-[#00D4FF] hover:underline flex items-center gap-0.5 ml-1"
+                        >
+                          View ↗
+                        </Link>
                       </div>
                     </div>
                   </div>

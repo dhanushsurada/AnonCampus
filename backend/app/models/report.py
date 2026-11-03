@@ -125,6 +125,32 @@ class Feedback(Base):
     )
 
 
+class Comment(Base):
+    """Anonymous public discussion and student perspectives on an issue cluster"""
+    __tablename__ = "comments"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    cluster_id = Column(Integer, ForeignKey("clusters.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    institution_id = Column(Integer, ForeignKey("institutions.id", ondelete="CASCADE"), nullable=False)
+
+    content = Column(Text, nullable=False)
+    author_role = Column(String(20), default="student", nullable=False)
+    author_department = Column(String(100), nullable=True)
+    author_year = Column(Integer, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    cluster = relationship("Cluster", back_populates="comments")
+    user = relationship("User", back_populates="comments")
+
+    __table_args__ = (
+        Index("ix_comments_cluster", "cluster_id"),
+        Index("ix_comments_institution", "institution_id"),
+        Index("ix_comments_created", "created_at"),
+    )
+
+
 class AdminAction(Base):
     """Audit log of every admin mutation"""
     __tablename__ = "admin_actions"

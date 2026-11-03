@@ -1,18 +1,61 @@
 'use client'
+import { useState } from 'react'
 import { Cluster } from '@/types'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { ScoreBar } from '@/components/ui/ScoreBar'
 import { fmtRelative, severityColor, confidenceColor } from '@/lib/utils'
-import { AlertTriangle, Users, MessageSquare, ThumbsUp, Clock, Flame, Sparkles } from 'lucide-react'
+import { AlertTriangle, Users, MessageSquare, ThumbsUp, Clock, Flame, MessageCircle } from 'lucide-react'
+import { issuesApi } from '@/lib/api'
+import { useQueryClient } from '@tanstack/react-query'
+import toast from 'react-hot-toast'
 import Link from 'next/link'
 
 export function ClusterCard({ cluster }: { cluster: Cluster }) {
+  const qc = useQueryClient()
+  const [hasSupported, setHasSupported] = useState(cluster.user_supported || false)
+  const [votes, setVotes] = useState(cluster.support_count)
+  const [isVoting, setIsVoting] = useState(false)
+
   const slaOverdue = cluster.sla_deadline && new Date(cluster.sla_deadline) < new Date()
   const momentumPct = Math.round(cluster.confidence_score * 100)
 
+  const handleVote = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (isVoting) return
+    setIsVoting(true)
+
+    if (hasSupported) {
+      try {
+        await issuesApi.removeSupport(cluster.id)
+        setHasSupported(false)
+        setVotes(v => Math.max(0, v - 1))
+        toast.success('Upvote removed')
+        qc.invalidateQueries({ queryKey: ['clusters'] })
+      } catch {
+        toast.error('Could not remove upvote')
+      } finally {
+        setIsVoting(false)
+      }
+    } else {
+      try {
+        await issuesApi.support(cluster.id)
+        setHasSupported(true)
+        setVotes(v => v + 1)
+        toast.success('Your upvote was recorded! 🚀')
+        qc.invalidateQueries({ queryKey: ['clusters'] })
+      } catch {
+        toast.error('Already supported or error recording vote')
+      } finally {
+        setIsVoting(false)
+      }
+    }
+  }
+
   return (
     <Link href={`/issues/${cluster.id}`}>
-      <div className="card card-hover p-5 cursor-pointer animate-slide-up flex flex-col justify-between h-full">
+      <div className="card card-hover p-5 cursor-pointer animate-slide-up flex flex-col justify-between h-full group">
         <div>
           {/* Header */}
           <div className="flex items-start justify-between gap-3 mb-3">
@@ -31,7 +74,7 @@ export function ClusterCard({ cluster }: { cluster: Cluster }) {
                   </span>
                 )}
               </div>
-              <h3 className="font-semibold text-sm leading-snug line-clamp-2 text-white hover:text-[#00D4FF] transition-colors">
+              <h3 className="font-semibold text-sm leading-snug line-clamp-2 text-white group-hover:text-[#00D4FF] transition-colors">
                 {cluster.title}
               </h3>
             </div>
@@ -62,19 +105,37 @@ export function ClusterCard({ cluster }: { cluster: Cluster }) {
           </div>
 
           {/* Backing and Engagement */}
-          <div className="flex items-center gap-3.5 text-xs text-[#94A3B8] mb-3">
-            <span className="flex items-center gap-1" title="Students who reported this issue">
-              <MessageSquare size={12} className="text-[#64748B]" />
-              {cluster.report_count} {cluster.report_count === 1 ? 'report' : 'reports'}
-            </span>
-            <span className="flex items-center gap-1" title="Students who upvoted this issue">
-              <ThumbsUp size={12} className="text-[#00D4FF]" />
-              {cluster.support_count} {cluster.support_count === 1 ? 'upvote' : 'upvotes'}
-            </span>
-            <span className="flex items-center gap-1" title="Academic departments affected">
-              <Users size={12} className="text-[#B44FFF]" />
-              {cluster.departments_involved.length} {cluster.departments_involved.length === 1 ? 'branch' : 'branches'}
-            </span>
+          <div className="flex items-center justify-between gap-2 text-xs text-[#94A3B8] mb-3">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1" title="Students who reported this issue">
+                <MessageSquare size={12} className="text-[#64748B]" />
+                {cluster.report_count}
+              </span>
+              <span className="flex items-center gap-1" title="Public student views and comments">
+                <MessageCircle size={12} className="text-[#00D4FF]" />
+                {cluster.comment_count ?? 0}
+              </span>
+              <span className="flex items-center gap-1" title="Academic departments affected">
+                <Users size={12} className="text-[#B44FFF]" />
+                {cluster.departments_involved.length} {cluster.departments_involved.length === 1 ? 'branch' : 'branches'}
+              </span>
+            </div>
+
+            {/* Direct Upvote Button */}
+            <button
+              onClick={handleVote}
+              disabled={isVoting}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                hasSupported
+                  ? 'bg-[#00D4FF]/20 text-[#00D4FF] border border-[#00D4FF]/40 shadow-[0_0_10px_rgba(0,212,255,0.2)]'
+                  : 'bg-[#1C2333] text-[#94A3B8] hover:text-[#00D4FF] hover:bg-[#1C2333]/90 border border-white/[0.08]'
+              }`}
+              title={hasSupported ? 'Click to remove your upvote' : 'Click to upvote this issue'}
+            >
+              <ThumbsUp size={11} className={hasSupported ? 'fill-[#00D4FF]' : ''} />
+              <span>{votes}</span>
+              <span className="hidden sm:inline">{hasSupported ? 'Upvoted' : 'Upvote'}</span>
+            </button>
           </div>
         </div>
 

@@ -17,11 +17,13 @@ import { Cluster, Issue } from '@/types'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
-const FEEDS = [
-  { key: undefined,  label: 'All Activity' },
-  { key: 'trending', label: '🔥 Trending' },
-  { key: 'active',   label: '🛠️ In Progress' },
-  { key: 'new',      label: '✨ Fresh Reports' },
+const STAT_GROUPS = [
+  { key: undefined,  label: 'All Topics',         desc: 'Campus-wide feed',      icon: Layers,     color: '#00D4FF' },
+  { key: 'trending', label: '🔥 Trending',        desc: 'High campus momentum',  icon: TrendingUp, color: '#FF8800' },
+  { key: 'urgent',   label: '⚡ Urgent & Severe', desc: 'Critical priority',     icon: Zap,        color: '#FF4444' },
+  { key: 'active',   label: '🛠️ In Progress',    desc: 'Under review & fixing', icon: Clock,      color: '#00FF88' },
+  { key: 'resolved', label: '✅ Resolved',        desc: 'Fixed & verified',      icon: BarChart3,  color: '#B44FFF' },
+  { key: 'new',      label: '✨ Fresh Reports',   desc: 'Recently submitted',    icon: Plus,       color: '#38BDF8' },
 ]
 
 const CATEGORIES = [
@@ -46,13 +48,6 @@ export default function DashboardPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
-
-  // Redirect admins to admin dashboard
-  useEffect(() => {
-    if (user?.role === 'admin' || user?.role === 'super_admin') {
-      router.push('/admin')
-    }
-  }, [user, router])
 
   // Campus clusters query
   const { data: clusterData, isLoading: clustersLoading, refetch: refetchClusters } = useQuery({
@@ -80,6 +75,26 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-[#080A0F] text-white">
       <div className="fixed inset-0 bg-grid-pattern bg-grid opacity-100 pointer-events-none" />
 
+      {/* Admin Preview Mode Banner */}
+      {(user?.role === 'admin' || user?.role === 'super_admin') && (
+        <div className="relative z-20 bg-gradient-to-r from-[#FFB800]/20 via-[#00D4FF]/15 to-[#FFB800]/20 border-b border-[#FFB800]/30 px-6 py-2.5 text-xs text-white">
+          <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <Shield size={14} className="text-[#FFB800] shrink-0" />
+              <span>
+                <strong className="text-[#FFB800]">Admin Preview Mode:</strong> You are exploring AnonCampus as a student. All student feeds, filters, upvotes, and issue views are active.
+              </span>
+            </div>
+            <Link
+              href="/admin"
+              className="px-3 py-1 rounded bg-[#FFB800] text-black font-semibold text-xs flex items-center gap-1.5 hover:bg-[#FFB800]/90 transition-all shrink-0 shadow-sm"
+            >
+              Return to Admin Portal <ArrowRight size={12} />
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Nav */}
       <nav className="relative z-10 sticky top-0 bg-[#080A0F]/90 backdrop-blur border-b border-white/[0.06] px-6 py-4">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
@@ -98,8 +113,13 @@ export default function DashboardPage() {
               <span>⭐ Credibility:</span> {user?.trust_score?.toFixed(2) ?? '1.00'}
             </div>
             {(user?.role === 'admin' || user?.role === 'super_admin') && (
-              <Link href="/admin" className="text-[#FFB800] hover:text-[#FFB800]/80 transition-colors" title="Admin Portal">
-                <Settings size={15} />
+              <Link
+                href="/admin"
+                className="px-2.5 py-1 rounded bg-[#FFB800]/10 text-[#FFB800] border border-[#FFB800]/30 hover:bg-[#FFB800]/20 text-xs font-medium flex items-center gap-1.5 transition-all"
+                title="Switch to Admin Dashboard"
+              >
+                <Settings size={13} />
+                <span>Admin View</span>
               </Link>
             )}
             <button
@@ -172,15 +192,47 @@ export default function DashboardPage() {
         {/* Main Feed Tab View */}
         {activeTab === 'feed' && (
           <div>
-            {/* Search and Filters Bar */}
-            <div className="space-y-4 mb-6">
+            {/* Interactive Topic & Urgency Groups */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+              {STAT_GROUPS.map(({ key, label, desc, icon: Icon, color }) => {
+                const isActive = feed === key
+                return (
+                  <button
+                    key={label}
+                    onClick={() => setFeed(key)}
+                    className={`card p-3.5 text-left transition-all relative overflow-hidden group cursor-pointer ${
+                      isActive
+                        ? 'border-[#00D4FF] bg-[#00D4FF]/10 shadow-[0_0_15px_rgba(0,212,255,0.15)] ring-1 ring-[#00D4FF]/40'
+                        : 'hover:border-white/20 hover:bg-[#1C2333]/40'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div
+                        className="w-7 h-7 rounded-md flex items-center justify-center transition-transform group-hover:scale-110"
+                        style={{ background: `${color}18` }}
+                      >
+                        <Icon size={14} style={{ color }} />
+                      </div>
+                      {isActive && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#00D4FF] shadow-[0_0_6px_#00D4FF]" />
+                      )}
+                    </div>
+                    <div className="font-semibold text-xs text-white truncate">{label}</div>
+                    <div className="text-[11px] text-[#64748B] mt-0.5 truncate">{desc}</div>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Search and Category Filters Bar */}
+            <div className="space-y-3 mb-6">
               <div className="relative">
                 <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#64748B]" />
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search issues by title, location, or keyword…"
+                  placeholder="Search campus issues by keyword, title, or hostel/block…"
                   className="input pl-10 pr-9 w-full text-sm py-2"
                 />
                 {searchTerm && (
@@ -193,34 +245,17 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              {/* Status and Category Filters */}
+              {/* Category Pills & Active Filter Bar */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                {/* Activity Feed tabs */}
-                <div className="flex flex-wrap gap-1.5">
-                  {FEEDS.map(({ key, label }) => (
-                    <button
-                      key={label}
-                      onClick={() => setFeed(key)}
-                      className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-                        feed === key
-                          ? 'bg-[#00D4FF]/15 text-[#00D4FF] border border-[#00D4FF]/30'
-                          : 'text-[#64748B] hover:text-white border border-transparent'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Category Pills */}
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                  <span className="text-xs text-[#64748B] mr-1 hidden sm:inline">Category:</span>
                   {CATEGORIES.map((cat) => (
                     <button
                       key={cat}
                       onClick={() => setCategory(cat)}
                       className={`px-2.5 py-1 rounded-md text-xs font-mono capitalize whitespace-nowrap transition-all ${
                         category === cat
-                          ? 'bg-white/10 text-white font-medium border border-white/20'
+                          ? 'bg-white/10 text-white font-medium border border-white/20 shadow-sm'
                           : 'text-[#64748B] hover:text-white'
                       }`}
                     >
@@ -228,6 +263,15 @@ export default function DashboardPage() {
                     </button>
                   ))}
                 </div>
+
+                {(feed !== undefined || category !== 'all' || searchTerm) && (
+                  <button
+                    onClick={() => { setFeed(undefined); setCategory('all'); setSearchTerm('') }}
+                    className="text-xs text-[#00D4FF] hover:underline flex items-center gap-1 shrink-0 self-start sm:self-auto"
+                  >
+                    <X size={12} /> Reset filters
+                  </button>
+                )}
               </div>
             </div>
 
@@ -244,29 +288,48 @@ export default function DashboardPage() {
                 ))}
               </div>
             ) : clusters.length === 0 ? (
-              <div className="text-center py-20 text-[#475569] card p-10">
+              <div className="card p-12 text-center max-w-lg mx-auto">
                 <Shield size={36} className="mx-auto mb-3 opacity-30 text-[#00D4FF]" />
-                <p className="font-semibold text-[#94A3B8] text-base">No matching issues found</p>
-                <p className="text-sm text-[#64748B] mt-1">
-                  {searchTerm || category !== 'all' || feed
-                    ? 'Try adjusting your search query or filter criteria.'
-                    : 'Be the first to submit a grievance anonymously.'}
+                <h3 className="font-semibold text-[#94A3B8] text-base mb-1">
+                  {feed === 'urgent'
+                    ? 'No Urgent or Escalated Issues'
+                    : feed === 'resolved'
+                    ? 'No Resolved Issues Found'
+                    : feed === 'active'
+                    ? 'No Issues Currently In Progress'
+                    : feed === 'trending'
+                    ? 'No High-Momentum Issues Yet'
+                    : searchTerm
+                    ? `No issues found for "${searchTerm}"`
+                    : 'No matching campus topics found'}
+                </h3>
+                <p className="text-xs text-[#64748B] max-w-md mx-auto mb-4 leading-relaxed">
+                  {feed === 'urgent'
+                    ? 'Great news! All recorded campus matters are currently within normal handling thresholds. There are no critical escalations pending.'
+                    : feed === 'resolved'
+                    ? 'Issues that are resolved and verified by college authorities will appear here.'
+                    : feed === 'trending'
+                    ? 'Trending issues gain prominence as more students from different departments upvote them.'
+                    : searchTerm || category !== 'all' || feed
+                    ? 'Try adjusting your search query, selecting another category, or clearing the filter.'
+                    : 'Be the first student to anonymously speak up and report a campus issue.'}
                 </p>
-                {(searchTerm || category !== 'all' || feed) ? (
-                  <button
-                    onClick={() => { setSearchTerm(''); setCategory('all'); setFeed(undefined) }}
-                    className="mt-4 text-xs text-[#00D4FF] hover:underline"
-                  >
-                    Clear all filters
-                  </button>
-                ) : (
+                <div className="flex items-center justify-center gap-3">
+                  {(searchTerm || category !== 'all' || feed !== undefined) && (
+                    <button
+                      onClick={() => { setSearchTerm(''); setCategory('all'); setFeed(undefined) }}
+                      className="btn-ghost text-xs py-1.5 px-3.5"
+                    >
+                      View All Issues
+                    </button>
+                  )}
                   <button
                     onClick={() => setShowModal(true)}
-                    className="mt-4 btn-primary text-sm px-4 py-2"
+                    className="btn-primary text-xs py-1.5 px-3.5 flex items-center gap-1.5"
                   >
-                    Submit First Issue
+                    <Plus size={13} /> Report an Issue
                   </button>
-                )}
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

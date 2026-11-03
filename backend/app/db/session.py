@@ -84,5 +84,20 @@ async def init_db():
             from sqlalchemy import text
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS security_question VARCHAR(255);"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS hashed_security_answer VARCHAR(255);"))
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS comments (
+                    id SERIAL PRIMARY KEY,
+                    cluster_id INTEGER NOT NULL REFERENCES clusters(id) ON DELETE CASCADE,
+                    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    institution_id INTEGER NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+                    content TEXT NOT NULL,
+                    author_role VARCHAR(20) NOT NULL DEFAULT 'student',
+                    author_department VARCHAR(100),
+                    author_year INTEGER,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+            """))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_comments_cluster ON comments(cluster_id);"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_comments_created ON comments(created_at);"))
         except Exception:
             pass  # Non-PostgreSQL dialects or SQLite in-memory tests ignore this

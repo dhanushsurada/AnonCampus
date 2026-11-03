@@ -103,6 +103,10 @@ def check_feedback_limit(user_id: int) -> None:
     _enforce(str(user_id), "feedback", limit=5, window=86400)
 
 
+def check_comment_limit(user_id: int) -> None:
+    _enforce(str(user_id), "comment", limit=20, window=3600)
+
+
 def check_register_limit(ip: str) -> None:
     _enforce(ip, "register", limit=5, window=3600)
 

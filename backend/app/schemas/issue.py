@@ -75,6 +75,33 @@ class FeedbackCreate(BaseModel):
     comment: Optional[str] = Field(default=None, max_length=1000)
 
 
+# ── Comments / Public Discussion ─────────────────────────────────────────────
+
+class CommentCreate(BaseModel):
+    content: str = Field(..., min_length=2, max_length=1000)
+
+    @field_validator("content")
+    @classmethod
+    def sanitize(cls, v: str) -> str:
+        v = re.sub(r'<[^>]+>', '', v)
+        v = v.strip()
+        if len(v) < 2:
+            raise ValueError("Comment must be at least 2 characters")
+        return v
+
+
+class CommentResponse(BaseModel):
+    id: int
+    cluster_id: int
+    content: str
+    author_role: str
+    author_department: Optional[str] = None
+    author_year: Optional[int] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 # ── Explainability ────────────────────────────────────────────────────────────
 
 class ScoreExplanation(BaseModel):
@@ -118,6 +145,8 @@ class ClusterResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     last_activity_at: datetime
+    user_supported: Optional[bool] = False
+    comment_count: Optional[int] = 0
 
     model_config = {"from_attributes": True}
 

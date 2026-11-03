@@ -199,6 +199,9 @@ export const issuesApi = {
   get: (id: number) => api.get(`/issues/${id}`),
   create: (data: any) => api.post('/issues', data),
   support: (id: number) => api.post(`/issues/${id}/support`),
+  removeSupport: (id: number) => api.delete(`/issues/${id}/support`),
+  getComments: (clusterId: number) => api.get(`/issues/clusters/${clusterId}/comments`),
+  addComment: (clusterId: number, content: string) => api.post(`/issues/clusters/${clusterId}/comments`, { content }),
   addContext: (id: number, context_text: string) =>
     api.post(`/issues/${id}/context`, { context_text }),
   feedback: (id: number, data: any) =>

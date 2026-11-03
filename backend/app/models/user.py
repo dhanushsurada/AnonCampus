@@ -79,6 +79,7 @@ class User(Base):
     reports = relationship("Report", back_populates="reporter", foreign_keys="Report.reporter_id")
     votes = relationship("Vote", back_populates="voter")
     feedbacks = relationship("Feedback", back_populates="user")
+    comments = relationship("Comment", back_populates="user")
     admin_actions = relationship("AdminAction", back_populates="admin",
                                   foreign_keys="AdminAction.admin_id")
 

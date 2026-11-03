@@ -41,6 +41,18 @@ export interface Cluster {
   created_at: string
   updated_at: string
   last_activity_at: string
+  user_supported?: boolean
+  comment_count?: number
+}
+
+export interface Comment {
+  id: number
+  cluster_id: number
+  content: string
+  author_role: string
+  author_department?: string
+  author_year?: number
+  created_at: string
 }
 
 export interface PaginatedResponse<T> {

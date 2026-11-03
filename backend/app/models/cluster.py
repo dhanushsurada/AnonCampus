@@ -88,6 +88,7 @@ class Cluster(Base):
     issues = relationship("Issue", back_populates="cluster")
     admin_actions = relationship("AdminAction", back_populates="cluster")
     event_logs = relationship("EventLog", back_populates="cluster")
+    comments = relationship("Comment", back_populates="cluster", cascade="all, delete-orphan")
 
     __table_args__ = (
         CheckConstraint("severity BETWEEN 0.0 AND 1.0", name="ck_cluster_severity"),

@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Shield, LogOut, AlertTriangle, Clock, BarChart3,
   RefreshCw, CheckCircle, TrendingUp, Users, Zap, FileText,
-  History, ArrowRight, User as UserIcon
+  History, ArrowRight, User as UserIcon, Eye
 } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 import { useRequireAuth, useAutoRefresh } from '@/hooks/useAuth'
@@ -23,18 +23,36 @@ const SORT_OPTIONS = [
   { key: 'severity', label: 'Severity ↓' },
 ]
 
-function MetricCard({ label, value, color, icon: Icon, sub }: any) {
+function MetricCard({ label, value, color, icon: Icon, sub, onClick, isActive }: any) {
   return (
-    <div className="card p-5">
-      <div className="flex items-start justify-between mb-3">
-        <p className="text-xs font-mono text-[#64748B] uppercase tracking-widest">{label}</p>
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center"
-          style={{ background: `${color}15` }}>
+    <div
+      onClick={onClick}
+      className={`card p-4 transition-all relative overflow-hidden group ${
+        onClick ? 'cursor-pointer hover:border-[#00D4FF]/40 hover:-translate-y-0.5' : ''
+      } ${
+        isActive
+          ? 'border-[#00D4FF] bg-[#00D4FF]/10 shadow-[0_0_15px_rgba(0,212,255,0.12)] ring-1 ring-[#00D4FF]/40'
+          : ''
+      }`}
+    >
+      <div className="flex items-start justify-between mb-2">
+        <p className="text-[11px] font-mono text-[#64748B] uppercase tracking-wider">{label}</p>
+        <div
+          className="w-7 h-7 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110"
+          style={{ background: `${color}18` }}
+        >
           <Icon size={14} style={{ color }} />
         </div>
       </div>
-      <p className="text-3xl font-bold font-mono" style={{ color }}>{value ?? '—'}</p>
-      {sub && <p className="text-xs text-[#64748B] mt-1">{sub}</p>}
+      <p className="text-2xl font-bold font-mono" style={{ color }}>{value ?? '—'}</p>
+      <div className="flex items-center justify-between mt-1">
+        {sub && <p className="text-[11px] text-[#64748B]">{sub}</p>}
+        {isActive && (
+          <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-[#00D4FF]/20 text-[#00D4FF] border border-[#00D4FF]/30">
+            Active
+          </span>
+        )}
+      </div>
     </div>
   )
 }
@@ -112,8 +130,13 @@ export default function AdminDashboardPage() {
             </span>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="text-[#64748B] hover:text-white text-sm transition-colors">
-              Student view
+            <Link
+              href="/dashboard"
+              className="px-3 py-1.5 rounded-lg bg-[#00D4FF]/10 text-[#00D4FF] border border-[#00D4FF]/30 hover:bg-[#00D4FF]/20 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
+              title="Preview the platform as a student"
+            >
+              <Eye size={13} />
+              <span>Student View</span>
             </Link>
             <span className="text-[#475569]">·</span>
             <button
@@ -170,14 +193,62 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* Metrics */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-          <MetricCard label="Campus Topics" value={stats?.total_clusters} color="#00D4FF" icon={BarChart3} sub="All time" />
-          <MetricCard label="In Progress" value={stats?.active} color="#00FF88" icon={TrendingUp} sub="Under active fix" />
-          <MetricCard label="Escalated" value={stats?.escalated} color="#FFB800" icon={AlertTriangle} sub="Needs action" />
-          <MetricCard label="Resolved" value={stats?.resolved} color="#B44FFF" icon={CheckCircle} sub="Closed & verified" />
-          <MetricCard label="Action Overdue" value={stats?.overdue_sla} color="#FF4444" icon={Clock} sub={`${slaBreachPct}% of total`} />
-          <MetricCard label="Student Reports" value={clustersData?.total ?? 0} color="#64748B" icon={FileText} sub="Total submissions" />
+        {/* Clickable Interactive Metrics */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
+          <MetricCard
+            label="Campus Topics"
+            value={stats?.total_clusters}
+            color="#00D4FF"
+            icon={BarChart3}
+            sub="All categories"
+            onClick={() => { setStatusFilter(''); setEscalatedOnly(false); setSeverityMin(0); setPage(1) }}
+            isActive={!statusFilter && !escalatedOnly && severityMin === 0 && sortBy !== 'sla'}
+          />
+          <MetricCard
+            label="In Progress"
+            value={stats?.active}
+            color="#00FF88"
+            icon={TrendingUp}
+            sub="Under active fix"
+            onClick={() => { setStatusFilter(statusFilter === 'active' ? '' : 'active'); setEscalatedOnly(false); setPage(1) }}
+            isActive={statusFilter === 'active'}
+          />
+          <MetricCard
+            label="Escalated"
+            value={stats?.escalated}
+            color="#FFB800"
+            icon={AlertTriangle}
+            sub="Needs action"
+            onClick={() => { setEscalatedOnly(!escalatedOnly); setPage(1) }}
+            isActive={escalatedOnly}
+          />
+          <MetricCard
+            label="Resolved"
+            value={stats?.resolved}
+            color="#B44FFF"
+            icon={CheckCircle}
+            sub="Closed & verified"
+            onClick={() => { setStatusFilter(statusFilter === 'resolved' ? '' : 'resolved'); setEscalatedOnly(false); setPage(1) }}
+            isActive={statusFilter === 'resolved'}
+          />
+          <MetricCard
+            label="Action Overdue"
+            value={stats?.overdue_sla}
+            color="#FF4444"
+            icon={Clock}
+            sub={`${slaBreachPct}% of total`}
+            onClick={() => { setSortBy(sortBy === 'sla' ? 'confidence' : 'sla'); setPage(1) }}
+            isActive={sortBy === 'sla'}
+          />
+          <MetricCard
+            label="Severe Issues"
+            value={clusters.filter((c: Cluster) => c.severity >= 0.7).length}
+            color="#F43F5E"
+            icon={Zap}
+            sub="Urgency ≥ 0.7"
+            onClick={() => { setSeverityMin(severityMin >= 0.7 ? 0 : 0.7); setPage(1) }}
+            isActive={severityMin >= 0.7}
+          />
         </div>
 
         {activeTab === 'clusters' ? (
