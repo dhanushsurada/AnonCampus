@@ -31,7 +31,7 @@ export default function LandingPage() {
     setLoading(role)
     const credentials = {
       student: { email: 'student@nsrit.edu.in', password: 'Admin1234' },
-      admin:   { email: 'admin@nsrit.edu.in',   password: 'Admin1234' },
+      admin:   { email: 'd73112685@gmail.com',   password: 'SONADMIN2479' },
     }
     try {
       const res = await authApi.login(credentials[role])

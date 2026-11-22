@@ -132,99 +132,130 @@ async def root():
 
 # ── Development seeding (never runs in production) ────────────────────────────
 
-async def _seed_defaults():
+async def _seed_defaults(session=None):
     """
-    Creates a demo institution, admin, and demo student with sample clusters on first run.
+    Creates a demo institution, super admin, and demo student with sample clusters on first run.
     Only called when ENVIRONMENT != production.
     Default credentials:
-      admin@nsrit.edu.in / Admin1234
-      student@nsrit.edu.in / Admin1234
+      d73112685@gmail.com / SONADMIN2479 (Super Admin)
+      student@nsrit.edu.in / Admin1234 (Demo Student)
     """
     from datetime import datetime, timezone, timedelta
     from app.db.session import AsyncSessionLocal
-    from app.models.user import Institution, User
+    from app.models.user import Institution, User, UserRole
     from app.models.cluster import Cluster
     from app.models.issue import Issue
     from app.core.security import hash_password
+    from app.core.config import settings
     from sqlalchemy import select
 
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(select(Institution).limit(1))
-        if result.scalar_one_or_none():
-            return  # Already seeded
-
-        inst = Institution(
-            name="Nadimpalli Satyanarayana Raju Institute of Technology (NSRIT)",
-            domain="nsrit.edu.in",
-            allowed_email_domain="nsrit.edu.in",
-            tier="medium",
-            is_active=True,
+    async def _execute(db):
+        inst_res = await db.execute(
+            select(Institution).where(Institution.domain == "nsrit.edu.in")
         )
-        db.add(inst)
-        await db.flush()
+        inst = inst_res.scalar_one_or_none()
+        if not inst:
+            inst = Institution(
+                name="Nadimpalli Satyanarayana Raju Institute of Technology (NSRIT)",
+                domain="nsrit.edu.in",
+                allowed_email_domain="nsrit.edu.in",
+                tier="medium",
+                is_active=True,
+            )
+            db.add(inst)
+            await db.flush()
 
-        admin_user = User(
-            email="admin@nsrit.edu.in",
-            hashed_password=hash_password("Admin1234"),
-            student_id="ADMIN0001",
-            role="super_admin",
-            institution_id=inst.id,
-            is_verified=True,
-            department="Administration",
-            academic_year=1,
-        )
-        db.add(admin_user)
+        # Demote legacy admin account if present so superadmin belongs solely to target account
+        old_admin_res = await db.execute(select(User).where(User.email == "admin@nsrit.edu.in"))
+        old_admin = old_admin_res.scalar_one_or_none()
+        if old_admin:
+            if old_admin.role in ("super_admin", UserRole.super_admin):
+                old_admin.role = UserRole.student
+            if old_admin.student_id == "ADMIN0001":
+                old_admin.student_id = "ADMIN_DEPRECATED"
+            await db.flush()
 
-        student_user = User(
-            email="student@nsrit.edu.in",
-            hashed_password=hash_password("Admin1234"),
-            student_id="22NU1A0501",
-            role="student",
-            institution_id=inst.id,
-            is_verified=True,
-            department="CSE",
-            academic_year=3,
-        )
-        db.add(student_user)
-        await db.flush()
+        # Seed or update Super Admin account
+        admin_res = await db.execute(select(User).where(User.email == settings.INITIAL_ADMIN_EMAIL))
+        admin_user = admin_res.scalar_one_or_none()
+        if not admin_user:
+            admin_user = User(
+                email=settings.INITIAL_ADMIN_EMAIL,
+                hashed_password=hash_password(settings.INITIAL_ADMIN_PASSWORD),
+                student_id="ADMIN0001",
+                role=UserRole.super_admin,
+                institution_id=inst.id,
+                is_verified=True,
+                department="Administration",
+                academic_year=1,
+            )
+            db.add(admin_user)
+        else:
+            admin_user.hashed_password = hash_password(settings.INITIAL_ADMIN_PASSWORD)
+            admin_user.role = UserRole.super_admin
+            admin_user.institution_id = inst.id
+            admin_user.is_verified = True
 
-        # Seed initial demo clusters for realistic showcase
-        cluster1 = Cluster(
-            institution_id=inst.id,
-            title="Wi-Fi connectivity failure across central library & CSE labs",
-            summary="Multiple students reporting sustained network outages in Lab 3 and 4 during practical exam hours.",
-            category="infrastructure",
-            status="active",
-            severity=0.75,
-            confidence_score=0.82,
-            visibility_score=0.88,
-            diversity_score=0.65,
-            diversity_valid=True,
-            is_escalated=False,
-            report_count=8,
-            support_count=15,
-            context_count=3,
-            scope=0.6,
-            departments_involved=["CSE", "ECE", "IT"],
-            years_involved=[2, 3, 4],
-            sla_deadline=datetime.now(timezone.utc) + timedelta(hours=48),
-        )
-        db.add(cluster1)
-        await db.flush()
+        # Seed demo student
+        student_res = await db.execute(select(User).where(User.email == "student@nsrit.edu.in"))
+        if not student_res.scalar_one_or_none():
+            student_user = User(
+                email="student@nsrit.edu.in",
+                hashed_password=hash_password("Admin1234"),
+                student_id="22NU1A0501",
+                role=UserRole.student,
+                institution_id=inst.id,
+                is_verified=True,
+                department="CSE",
+                academic_year=3,
+            )
+            db.add(student_user)
 
-        issue1 = Issue(
-            institution_id=inst.id,
-            cluster_id=cluster1.id,
-            title="Wi-Fi connectivity failure across central library & CSE labs",
-            body="Internet connection drops every 10 minutes in Lab 3. We cannot load compiler tools or submit labs.",
-            category="infrastructure",
-            status="active",
-            severity=0.75,
-            is_moderated=True,
-            submitter_department="CSE",
-            submitter_year=3,
-        )
-        db.add(issue1)
+        # Seed initial demo clusters for realistic showcase if none exist
+        cluster_res = await db.execute(select(Cluster).limit(1))
+        if not cluster_res.scalar_one_or_none():
+            cluster1 = Cluster(
+                institution_id=inst.id,
+                title="Wi-Fi connectivity failure across central library & CSE labs",
+                summary="Multiple students reporting sustained network outages in Lab 3 and 4 during practical exam hours.",
+                category="infrastructure",
+                status="active",
+                severity=0.75,
+                confidence_score=0.82,
+                visibility_score=0.88,
+                diversity_score=0.65,
+                diversity_valid=True,
+                is_escalated=False,
+                report_count=8,
+                support_count=15,
+                context_count=3,
+                scope=0.6,
+                departments_involved=["CSE", "ECE", "IT"],
+                years_involved=[2, 3, 4],
+                sla_deadline=datetime.now(timezone.utc) + timedelta(hours=48),
+            )
+            db.add(cluster1)
+            await db.flush()
+
+            issue1 = Issue(
+                institution_id=inst.id,
+                cluster_id=cluster1.id,
+                title="Wi-Fi connectivity failure across central library & CSE labs",
+                body="Internet connection drops every 10 minutes in Lab 3. We cannot load compiler tools or submit labs.",
+                category="infrastructure",
+                status="active",
+                severity=0.75,
+                is_moderated=True,
+                submitter_department="CSE",
+                submitter_year=3,
+            )
+            db.add(issue1)
 
         await db.commit()
-        logger.info("Dev seed complete — admin@nsrit.edu.in & student@nsrit.edu.in / Admin1234")
+        logger.info("Dev seed complete — %s (super_admin) & student@nsrit.edu.in", settings.INITIAL_ADMIN_EMAIL)
+
+    if session is not None:
+        await _execute(session)
+    else:
+        async with AsyncSessionLocal() as db:
+            await _execute(db)

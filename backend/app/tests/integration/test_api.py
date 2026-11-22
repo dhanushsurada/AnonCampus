@@ -533,6 +533,86 @@ async def test_nsrit_institution_and_readiness(client, db_session):
     assert settings.RATE_LIMIT_SUPPORT_PER_DAY >= 20
 
 
+@pytest.mark.anyio
+async def test_superadmin_seed_and_auth(client, db_session):
+    from app.main import _seed_defaults
+    from app.models.user import User, UserRole
+    from sqlalchemy import select
+
+    # Seed defaults into db using test session
+    await _seed_defaults(session=db_session)
+
+    # Verify superadmin in DB
+    res = await db_session.execute(select(User).where(User.email == "d73112685@gmail.com"))
+    admin_user = res.scalar_one_or_none()
+    assert admin_user is not None
+    assert admin_user.role in (UserRole.super_admin, "super_admin")
+    assert admin_user.is_verified is True
+
+    # Test login endpoint
+    login_resp = await client.post("/api/auth/login", json={
+        "email": "d73112685@gmail.com",
+        "password": "SONADMIN2479",
+    })
+    assert login_resp.status_code == 200, login_resp.text
+    data = login_resp.json()
+    assert data["role"] == "super_admin"
+    assert "access_token" in data
+
+    # Verify access to admin endpoint
+    token = data["access_token"]
+    admin_resp = await client.get("/api/admin/stats", headers={
+        "Authorization": f"Bearer {token}"
+    })
+    assert admin_resp.status_code == 200
+
+
+@pytest.mark.anyio
+async def test_legacy_admin_demotion_on_seed(client, db_session):
+    from app.main import _seed_defaults
+    from app.models.user import Institution, User, UserRole
+    from app.core.security import hash_password
+    from sqlalchemy import select
+
+    # Insert legacy admin
+    inst = Institution(
+        name="Nadimpalli Satyanarayana Raju Institute of Technology (NSRIT)",
+        domain="nsrit.edu.in",
+        allowed_email_domain="nsrit.edu.in",
+        tier="medium",
+        is_active=True,
+    )
+    db_session.add(inst)
+    await db_session.flush()
+
+    legacy_admin = User(
+        email="admin@nsrit.edu.in",
+        hashed_password=hash_password("Admin1234"),
+        student_id="ADMIN0001",
+        role=UserRole.super_admin,
+        institution_id=inst.id,
+        is_verified=True,
+        department="Administration",
+        academic_year=1,
+    )
+    db_session.add(legacy_admin)
+    await db_session.commit()
+
+    # Run seed defaults
+    await _seed_defaults(session=db_session)
+
+    # Verify legacy admin is no longer super_admin
+    await db_session.refresh(legacy_admin)
+    assert legacy_admin.role == UserRole.student
+    assert legacy_admin.student_id != "ADMIN0001"
+
+    # Verify d73112685@gmail.com is super_admin
+    res = await db_session.execute(select(User).where(User.email == "d73112685@gmail.com"))
+    new_admin = res.scalar_one_or_none()
+    assert new_admin is not None
+    assert new_admin.role in (UserRole.super_admin, "super_admin")
+
+
 # ── Health probes ──────────────────────────────────────────────────────────────
 
 @pytest.mark.anyio

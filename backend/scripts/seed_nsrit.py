@@ -75,6 +75,20 @@ async def main():
 
         # Step 3: Verify Administrator Account
         print("\n[3/4] Verifying NSRIT Administrator account...")
+
+        # Deprecate legacy admin if present
+        old_admin_result = await session.execute(
+            select(User).where(User.email == "admin@nsrit.edu.in")
+        )
+        old_admin = old_admin_result.scalar_one_or_none()
+        if old_admin and old_admin.email != settings.INITIAL_ADMIN_EMAIL:
+            if old_admin.role in (UserRole.super_admin, "super_admin"):
+                old_admin.role = UserRole.student
+            if old_admin.student_id == "ADMIN0001":
+                old_admin.student_id = "ADMIN_DEPRECATED"
+            await session.commit()
+            print("  ✓ Deprecated legacy admin@nsrit.edu.in role to student")
+
         admin_email = settings.INITIAL_ADMIN_EMAIL
         admin_result = await session.execute(
             select(User).where(User.email == admin_email)
@@ -97,10 +111,11 @@ async def main():
             await session.commit()
             print(f"  ✓ Administrator account created: {admin_email}")
         else:
-            if admin.institution_id != inst.id or not admin.is_verified:
-                admin.institution_id = inst.id
-                admin.is_verified = True
-                await session.commit()
+            admin.hashed_password = hash_password(settings.INITIAL_ADMIN_PASSWORD)
+            admin.role = UserRole.super_admin
+            admin.institution_id = inst.id
+            admin.is_verified = True
+            await session.commit()
             print(f"  ✓ Administrator account verified: {admin_email} (Role: {admin.role.value if hasattr(admin.role, 'value') else admin.role})")
 
         # Step 4: Audit Existing Data & Concurrency Sizing

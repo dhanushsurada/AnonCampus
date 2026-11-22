@@ -161,7 +161,7 @@ This creates all tables, indexes, enums, and the partial unique index on `system
 
 | Role | Email | Password |
 |---|---|---|
-| Super Admin | admin@nsrit.edu.in | Admin1234 |
+| Super Admin | d73112685@gmail.com | SONADMIN2479 |
 
 > These credentials are seeded automatically in development mode only. They do **not** exist in production.
 

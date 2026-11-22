@@ -32,8 +32,8 @@ class Settings(BaseSettings):
     RATE_LIMIT_COMMENT_PER_HOUR: int = 30
 
     # NSRIT Institutional Seeding Defaults
-    INITIAL_ADMIN_EMAIL: str = "admin@nsrit.edu.in"
-    INITIAL_ADMIN_PASSWORD: str = "Admin1234"
+    INITIAL_ADMIN_EMAIL: str = "d73112685@gmail.com"
+    INITIAL_ADMIN_PASSWORD: str = "SONADMIN2479"
 
     # SMTP / Outgoing Email Settings
     SMTP_HOST: Optional[str] = None
