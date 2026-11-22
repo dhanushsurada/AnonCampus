@@ -154,7 +154,7 @@ async def _seed_defaults():
             return  # Already seeded
 
         inst = Institution(
-            name="NSRIT — Demo Campus",
+            name="Nadimpalli Satyanarayana Raju Institute of Technology (NSRIT)",
             domain="nsrit.edu.in",
             allowed_email_domain="nsrit.edu.in",
             tier="medium",

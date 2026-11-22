@@ -75,7 +75,8 @@ export default function AdminDashboardPage() {
     queryKey: ['admin-stats'],
     queryFn: () => adminApi.stats().then(r => r.data),
     enabled: !!user,
-    refetchInterval: 30_000,
+    refetchInterval: 45_000,
+    staleTime: 15_000,
   })
 
   const { data: clustersData, isLoading: clustersLoading } = useQuery({
@@ -86,14 +87,16 @@ export default function AdminDashboardPage() {
       escalated_only: escalatedOnly,
     }).then(r => r.data),
     enabled: !!user && activeTab === 'clusters',
-    refetchInterval: 15_000,
+    refetchInterval: 30_000,
+    staleTime: 15_000,
   })
 
   const { data: auditData, isLoading: auditLoading } = useQuery({
     queryKey: ['admin-audit', page],
     queryFn: () => adminApi.auditLog({ page, page_size: 20 }).then(r => r.data),
     enabled: !!user && activeTab === 'audit',
-    refetchInterval: 20_000,
+    refetchInterval: 30_000,
+    staleTime: 15_000,
   })
 
   const clusters: Cluster[] = (clustersData?.items ?? [])

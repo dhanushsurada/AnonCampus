@@ -59,6 +59,7 @@ export default function DashboardPage() {
       page_size: 30,
     }).then(r => r.data),
     enabled: !!user && activeTab === 'feed',
+    staleTime: 15_000,
   })
 
   // Student's own submissions query
@@ -66,6 +67,7 @@ export default function DashboardPage() {
     queryKey: ['my-issues'],
     queryFn: () => issuesApi.myIssues({ page_size: 50 }).then(r => r.data),
     enabled: !!user && activeTab === 'my_submissions',
+    staleTime: 15_000,
   })
 
   const clusters: Cluster[] = clusterData?.items ?? []

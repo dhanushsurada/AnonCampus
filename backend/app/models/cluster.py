@@ -97,6 +97,7 @@ class Cluster(Base):
         Index("ix_clusters_institution_status", "institution_id", "status"),
         Index("ix_clusters_institution_visibility", "institution_id", "visibility_score"),
         Index("ix_clusters_escalated", "institution_id", "is_escalated"),
+        Index("ix_clusters_institution_category", "institution_id", "category"),
     )
 
     def __repr__(self):

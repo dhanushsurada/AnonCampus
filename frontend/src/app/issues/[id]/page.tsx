@@ -37,7 +37,8 @@ export default function IssueDetailPage() {
     queryKey: ['cluster-comments', id],
     queryFn: () => issuesApi.getComments(Number(id)).then(r => r.data),
     enabled: !!id && !!user,
-    refetchInterval: 10_000,
+    refetchInterval: 30_000,
+    staleTime: 15_000,
   })
 
   const [hasSupported, setHasSupported] = useState<boolean>(cluster?.user_supported || false)

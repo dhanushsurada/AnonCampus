@@ -45,13 +45,25 @@ if _should_use_ssl(settings.DATABASE_URL):
     _ssl_ctx = ssl.create_default_context()
     connect_args["ssl"] = _ssl_ctx
 
+engine_kwargs = {
+    "echo": settings.ENVIRONMENT == "development",
+    "connect_args": connect_args,
+}
+
+if "sqlite" in settings.DATABASE_URL.lower():
+    engine_kwargs["pool_pre_ping"] = True
+else:
+    engine_kwargs.update({
+        "pool_pre_ping": True,
+        "pool_size": settings.DB_POOL_SIZE,
+        "max_overflow": settings.DB_MAX_OVERFLOW,
+        "pool_timeout": settings.DB_POOL_TIMEOUT,
+        "pool_recycle": settings.DB_POOL_RECYCLE,
+    })
+
 engine = create_async_engine(
     _clean_db_url(settings.DATABASE_URL),
-    echo=settings.ENVIRONMENT == "development",
-    pool_pre_ping=True,
-    pool_size=5,
-    max_overflow=10,
-    connect_args=connect_args,
+    **engine_kwargs
 )
 
 AsyncSessionLocal = async_sessionmaker(
@@ -74,6 +86,40 @@ async def get_db():
             raise
         finally:
             await session.close()
+
+
+async def ensure_nsrit_institution(db: AsyncSession):
+    """Guarantees that NSRIT institution and its primary record exist in the database."""
+    from sqlalchemy import select
+    from app.models.user import Institution
+
+    res = await db.execute(
+        select(Institution).where(Institution.domain == "nsrit.edu.in")
+    )
+    inst = res.scalar_one_or_none()
+    if not inst:
+        inst = Institution(
+            name="Nadimpalli Satyanarayana Raju Institute of Technology (NSRIT)",
+            domain="nsrit.edu.in",
+            allowed_email_domain="nsrit.edu.in",
+            tier="medium",
+            is_active=True,
+        )
+        db.add(inst)
+        await db.commit()
+        await db.refresh(inst)
+    else:
+        updated = False
+        if "Demo" in inst.name or inst.name == "Nsrit Edu In":
+            inst.name = "Nadimpalli Satyanarayana Raju Institute of Technology (NSRIT)"
+            updated = True
+        if not inst.is_active:
+            inst.is_active = True
+            updated = True
+        if updated:
+            await db.commit()
+            await db.refresh(inst)
+    return inst
 
 
 async def init_db():
@@ -99,5 +145,13 @@ async def init_db():
             """))
             await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_comments_cluster ON comments(cluster_id);"))
             await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_comments_created ON comments(created_at);"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_clusters_institution_category ON clusters(institution_id, category);"))
         except Exception:
             pass  # Non-PostgreSQL dialects or SQLite in-memory tests ignore this
+
+    # Ensure NSRIT exists in database on startup
+    try:
+        async with AsyncSessionLocal() as session:
+            await ensure_nsrit_institution(session)
+    except Exception:
+        pass  # In tests or offline environments, ignore

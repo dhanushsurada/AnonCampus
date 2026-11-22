@@ -92,11 +92,11 @@ def _enforce(identifier: str, action: str, limit: int, window: int) -> None:
 # ── Action-specific enforcers ─────────────────────────────────────────────────
 
 def check_issue_submit_limit(user_id: int) -> None:
-    _enforce(str(user_id), "issue_submit", limit=3, window=86400)
+    _enforce(str(user_id), "issue_submit", limit=settings.RATE_LIMIT_SUBMIT_PER_DAY, window=86400)
 
 
 def check_support_limit(user_id: int) -> None:
-    _enforce(str(user_id), "support", limit=3, window=86400)
+    _enforce(str(user_id), "support", limit=settings.RATE_LIMIT_SUPPORT_PER_DAY, window=86400)
 
 
 def check_feedback_limit(user_id: int) -> None:
@@ -104,11 +104,11 @@ def check_feedback_limit(user_id: int) -> None:
 
 
 def check_comment_limit(user_id: int) -> None:
-    _enforce(str(user_id), "comment", limit=20, window=3600)
+    _enforce(str(user_id), "comment", limit=settings.RATE_LIMIT_COMMENT_PER_HOUR, window=3600)
 
 
 def check_register_limit(ip: str) -> None:
-    _enforce(ip, "register", limit=5, window=3600)
+    _enforce(ip, "register", limit=settings.RATE_LIMIT_REGISTER_PER_HOUR, window=3600)
 
 
 # ── Idempotency ───────────────────────────────────────────────────────────────

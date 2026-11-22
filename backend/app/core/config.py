@@ -19,6 +19,22 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     ALLOWED_ORIGINS: List[str] = ["http://localhost:3000"]
 
+    # Database Pool Settings (Scaled for 1,000+ concurrent users)
+    DB_POOL_SIZE: int = 25
+    DB_MAX_OVERFLOW: int = 50
+    DB_POOL_TIMEOUT: int = 30
+    DB_POOL_RECYCLE: int = 1800
+
+    # Rate Limiting Settings (Campus NAT aware)
+    RATE_LIMIT_REGISTER_PER_HOUR: int = 500
+    RATE_LIMIT_SUPPORT_PER_DAY: int = 30
+    RATE_LIMIT_SUBMIT_PER_DAY: int = 5
+    RATE_LIMIT_COMMENT_PER_HOUR: int = 30
+
+    # NSRIT Institutional Seeding Defaults
+    INITIAL_ADMIN_EMAIL: str = "admin@nsrit.edu.in"
+    INITIAL_ADMIN_PASSWORD: str = "Admin1234"
+
     # SMTP / Outgoing Email Settings
     SMTP_HOST: Optional[str] = None
     SMTP_PORT: int = 587

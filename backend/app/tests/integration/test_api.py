@@ -512,6 +512,27 @@ async def test_retract_support(client, student_token, student2_token):
     assert sup_resp2.status_code == 200
 
 
+@pytest.mark.anyio
+async def test_nsrit_institution_and_readiness(client, db_session):
+    from app.db.session import ensure_nsrit_institution
+    from app.models.user import Institution
+    from app.core.config import settings
+    from sqlalchemy import select
+
+    inst = await ensure_nsrit_institution(db_session)
+    assert inst is not None
+    assert inst.domain == "nsrit.edu.in"
+    assert inst.allowed_email_domain == "nsrit.edu.in"
+    assert inst.is_active is True
+    assert "NSRIT" in inst.name
+
+    # Check pool and rate limits for 1,000 students
+    assert settings.DB_POOL_SIZE >= 20
+    assert settings.DB_MAX_OVERFLOW >= 40
+    assert settings.RATE_LIMIT_REGISTER_PER_HOUR >= 100
+    assert settings.RATE_LIMIT_SUPPORT_PER_DAY >= 20
+
+
 # ── Health probes ──────────────────────────────────────────────────────────────
 
 @pytest.mark.anyio
